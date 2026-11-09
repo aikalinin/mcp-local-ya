@@ -5059,3 +5059,149 @@ fn mcp_stdio_confirm_policy_sends_over_smtp_after_accept() {
         "cancelled"
     );
 }
+
+fn mail_draft_tool_call(id: u64, name: &str, arguments: Value) -> String {
+    mcp_request(
+        id,
+        "tools/call",
+        json!({ "name": name, "arguments": arguments }),
+    )
+}
+
+#[test]
+fn mcp_stdio_lists_draft_only_mail_tools_as_non_destructive() {
+    let temp = tempdir().expect("tempdir");
+    let input = [
+        initialize_request(false),
+        mcp_request(2, "tools/list", json!({})),
+    ]
+    .concat();
+
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .args(["mcp"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let responses = parse_responses(&output);
+    let tools = responses[1]["result"]["tools"].as_array().expect("tools");
+    for name in [
+        "yamcli.mail.draft",
+        "yamcli.mail.draft_reply",
+        "yamcli.mail.draft_forward",
+    ] {
+        let tool = tools
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .unwrap_or_else(|| panic!("{name} is not listed"));
+        assert_eq!(tool["annotations"]["destructiveHint"], false, "{name}");
+        assert_eq!(tool["annotations"]["readOnlyHint"], false, "{name}");
+        let description = tool["description"].as_str().expect("description");
+        assert!(description.contains("Drafts"), "{name}: {description}");
+    }
+}
+
+#[test]
+fn mcp_stdio_mail_draft_ignores_send_policy_and_never_uses_smtp() {
+    let temp = tempdir().expect("tempdir");
+    write_dead_mail_account(temp.path(), closed_local_port(), closed_local_port());
+    let arguments = |dry_run: bool| {
+        json!({
+            "account": "mock",
+            "to": "person@example.com",
+            "subject": "Hello",
+            "text": "body",
+            "dry_run": dry_run
+        })
+    };
+
+    let input = [
+        initialize_request(false),
+        mail_draft_tool_call(2, "yamcli.mail.draft", arguments(true)),
+        mail_draft_tool_call(3, "yamcli.mail.draft", arguments(false)),
+    ]
+    .concat();
+
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_SEND_POLICY", "send")
+        .args(["mcp"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let responses = parse_responses(&output);
+    let delivery = &responses[1]["result"]["structuredContent"]["delivery"];
+    assert_eq!(delivery["configured_policy"], "send");
+    assert_eq!(delivery["effective_policy"], "draft");
+    assert!(
+        delivery["reason"]
+            .as_str()
+            .expect("reason")
+            .contains("yamcli.mail.draft"),
+        "{delivery}"
+    );
+
+    // Even with policy `send`, the real call goes to IMAP (Drafts), never SMTP.
+    let message = responses[2]["error"]["message"]
+        .as_str()
+        .expect("error text");
+    assert!(message.contains("IMAP"), "{message}");
+    assert!(!message.contains("SMTP"), "{message}");
+}
+
+#[test]
+fn mcp_stdio_draft_reply_and_forward_never_ask_for_send_confirmation() {
+    let temp = tempdir().expect("tempdir");
+    write_dead_mail_account(temp.path(), closed_local_port(), closed_local_port());
+
+    let input = [
+        initialize_request_with_elicitation(),
+        mail_draft_tool_call(
+            2,
+            "yamcli.mail.draft_reply",
+            json!({ "account": "mock", "uid": 7, "text": "ok" }),
+        ),
+        mail_draft_tool_call(
+            3,
+            "yamcli.mail.draft_forward",
+            json!({ "account": "mock", "uid": 7, "to": "person@example.com" }),
+        ),
+    ]
+    .concat();
+
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_SEND_POLICY", "confirm")
+        .args(["mcp"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let responses = parse_responses(&output);
+    assert!(
+        responses
+            .iter()
+            .all(|response| response["method"] != "elicitation/create"),
+        "draft-only tools must not trigger send confirmation: {responses:?}"
+    );
+    for id in [2, 3] {
+        let response = responses
+            .iter()
+            .find(|response| response["id"] == id)
+            .unwrap_or_else(|| panic!("no response for id {id}"));
+        let message = response["error"]["message"].as_str().expect("error text");
+        assert!(message.contains("IMAP"), "{message}");
+        assert!(!message.contains("SMTP"), "{message}");
+    }
+}

@@ -216,6 +216,9 @@ yamcli mail forward 1353 person@example.com "Посмотрите, пожалу�
 yamcli mail send person@example.com "Синк" "Привет"
 yamcli mail send person@example.com "Счёт" "Во вложении файл" --attach ./invoice.pdf
 yamcli mail send person@example.com "Счёт" "Во вложении файл" --attach ./invoice.pdf --dry-run
+yamcli mail send person@example.com "Счёт" "Черновик, отправлю сам" --draft
+yamcli mail reply 1353 "Черновик ответа" --draft
+yamcli mail forward 1353 person@example.com --draft
 yamcli mail send-link person@example.com "Материалы" "Отправляю ссылку" --source ./archive.zip --path disk:/docs/archive/archive.zip
 yamcli mail send-link person@example.com "Материалы" "Отправляю ссылку" --source ./archive.zip --path disk:/docs/archive/archive.zip --dry-run
 yamcli mail send-published-link person@example.com "Материалы" "Отправляю ссылку" --public-url https://disk.yandex.ru/i/archive-link
@@ -421,6 +424,7 @@ MCP-сервер даёт ИИ-агенту полный доступ к поч�
 | Переменная | По умолчанию | Что делает |
 | --- | --- | --- |
 | `YAMCLI_MCP_SEND_POLICY` | `draft` | Как уходят письма из `yamcli.mail.send` / `reply` / `forward` / `send_link` / `send_published_link`. `draft` — письмо сохраняется в «Черновики» через IMAP, пользователь отправляет его сам из почтового клиента. `confirm` — на `stdio` с клиентом, поддерживающим `elicitation`, сервер спрашивает подтверждение у человека и только после `accept` отправляет по SMTP; без поддержки elicitation (и по HTTP) деградирует до `draft`, никогда до `send`. `send` — немедленная отправка (старое поведение). |
+| — | — | Инструменты `yamcli.mail.draft`, `yamcli.mail.draft_reply` и `yamcli.mail.draft_forward` всегда только сохраняют письмо в «Черновики» и никогда не отправляют, при любом значении `YAMCLI_MCP_SEND_POLICY`. Их можно разрешить агенту без подтверждений: на хосте они не помечены как разрушительные. В CLI то же делает флаг `--draft` у `mail send`, `mail reply` и `mail forward`. |
 | `YAMCLI_MCP_ALLOWED_PATHS` | не задано = запрет | Каталоги (через `:` на Unix, `;` на Windows), внутри которых MCP-инструменты могут читать (`attachments`, `source`, `source_path`) и писать (`output_path`) локальные файлы. Симлинки разрешаются до проверки; скрытые файлы и каталоги внутри разрешённого пути (`.git`, `.env`, `.bashrc`…), `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, `~/.docker`, `.netrc`, `.git-credentials`, `.npmrc`, `.pypirc` и каталог конфигурации yamcli запрещены всегда. Домашний каталог и корень ФС как значение отвергаются. Без переменной инструменты не имеют доступа к файлам вообще. |
 | `YAMCLI_MCP_HTTP_BEARER_TOKEN` | не задано | Токен для HTTP-транспорта; при наличии обязателен для каждого запроса. Без токена разрешён только loopback. |
 

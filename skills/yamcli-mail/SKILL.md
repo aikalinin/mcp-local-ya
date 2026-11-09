@@ -48,15 +48,15 @@ UID берётся из вывода `mail list` или `mail search`. Возв�
 ### Отправка письма
 
 ```
-yamcli mail send КОМУ ТЕМА [ТЕКСТ] [--cc EMAIL]... [--bcc EMAIL]... [--html HTML] [--account ALIAS]
+yamcli mail send КОМУ ТЕМА [ТЕКСТ] [--cc EMAIL]... [--bcc EMAIL]... [--html HTML] [--account ALIAS] [--draft]
 ```
 
-ТЕКСТ — простой текст. `--html` для HTML-содержимого.
+ТЕКСТ — простой текст. `--html` для HTML-содержимого. `--draft` — сохранить письмо в «Черновики» и не отправлять.
 
 ### Ответ на письмо
 
 ```
-yamcli mail reply UID [ТЕКСТ] [--folder FOLDER] [--cc EMAIL]... [--html HTML] [--account ALIAS]
+yamcli mail reply UID [ТЕКСТ] [--folder FOLDER] [--cc EMAIL]... [--html HTML] [--account ALIAS] [--draft]
 ```
 
 Отвечает на письмо по UID. Сохраняет заголовки цепочки.
@@ -64,7 +64,7 @@ yamcli mail reply UID [ТЕКСТ] [--folder FOLDER] [--cc EMAIL]... [--html HTM
 ### Пересылка письма
 
 ```
-yamcli mail forward UID КОМУ [ТЕКСТ] [--folder FOLDER] [--cc EMAIL]... [--bcc EMAIL]... [--html HTML] [--account ALIAS]
+yamcli mail forward UID КОМУ [ТЕКСТ] [--folder FOLDER] [--cc EMAIL]... [--bcc EMAIL]... [--html HTML] [--account ALIAS] [--draft]
 ```
 
 Пересылает письмо с оригинальным содержимым.

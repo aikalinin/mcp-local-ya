@@ -49,8 +49,8 @@ use crate::mail::{
     MailInviteInspectRequest, MailMessage, MailMessageSummary, MailReplyRequest, MailSendRequest,
     MailSendReview, RepliedMail, SentMail, export_mail_attachment, forward_mail_message,
     inspect_mail_invite, list_mail_folders, list_mail_messages, load_mail_attachments,
-    read_mail_message, reply_to_mail_message, review_mail_submission, search_mail_messages,
-    send_mail_message,
+    read_mail_message, reply_to_mail_message, review_mail_submission, save_mail_draft,
+    search_mail_messages, send_mail_message,
 };
 use crate::mail_invite_flow::{
     MailInviteCreateEventPartialFailure, invite_create_event_command,
@@ -2534,6 +2534,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
             html,
             attachments,
             dry_run,
+            draft,
         } => {
             let (resolved_account, auth, context) =
                 resolve_mail_private_context(account.as_deref())?;
@@ -2567,11 +2568,16 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
                     render_mail_send_review_table(&resolved_account, &review),
                 )
             } else {
-                let sent = send_mail_message(&context.smtp_host, context.smtp_port, auth, request)?;
+                let sent = if draft {
+                    save_mail_draft(&context.imap_host, context.imap_port, auth, request)?
+                } else {
+                    send_mail_message(&context.smtp_host, context.smtp_port, auth, request)?
+                };
+                let operation = if draft { "mail.draft" } else { "mail.send" };
 
                 ok_output(
                     format,
-                    "mail.send",
+                    operation,
                     json!({
                         "account": resolved_account,
                         "email": context.email,
@@ -2593,10 +2599,15 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
                     replay.push_str(" --dry-run");
                     record_activity_best_effort(NewActivityEntry {
                         source: "cli".to_string(),
-                        operation: "mail.send".to_string(),
+                        operation: operation.to_string(),
                         account: resolved_account.clone(),
                         summary: format!(
-                            "Отправлено письмо {}: {}",
+                            "{} {}: {}",
+                            if draft {
+                                "Сохранён черновик для"
+                            } else {
+                                "Отправлено письмо"
+                            },
                             sent.to.first().cloned().unwrap_or_else(|| "-".to_string()),
                             sent.subject
                         ),
@@ -2818,6 +2829,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
             body,
             cc,
             html,
+            draft,
         } => {
             let (resolved_account, auth, context) =
                 resolve_mail_private_context(account.as_deref())?;
@@ -2834,7 +2846,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
                     text: body,
                     html,
                 },
-                MailDelivery::Smtp,
+                cli_mail_delivery(draft, &context.imap_host, context.imap_port),
             )?;
 
             ok_output(
@@ -2859,6 +2871,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
             bcc,
             html,
             max_source_bytes,
+            draft,
         } => {
             let (resolved_account, auth, context) =
                 resolve_mail_private_context(account.as_deref())?;
@@ -2878,7 +2891,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
                     html,
                     max_source_bytes,
                 },
-                MailDelivery::Smtp,
+                cli_mail_delivery(draft, &context.imap_host, context.imap_port),
             )?;
 
             ok_output(
@@ -5295,6 +5308,18 @@ fn render_mail_read_table(account: &str, folder: &str, message: &MailMessage) ->
     lines.join("\n")
 }
 
+/// `--draft` stores the message in the Drafts folder over IMAP instead of sending it.
+fn cli_mail_delivery(draft: bool, imap_host: &str, imap_port: u16) -> MailDelivery<'_> {
+    if draft {
+        MailDelivery::Draft {
+            imap_host,
+            imap_port,
+        }
+    } else {
+        MailDelivery::Smtp
+    }
+}
+
 fn render_mail_send_table(account: &str, sent: &SentMail) -> String {
     render_key_value_table(&[
         ("account", account.to_string()),
@@ -5312,6 +5337,22 @@ fn render_mail_send_table(account: &str, sent: &SentMail) -> String {
         ("subject", sent.subject.clone()),
         ("message_id", sent.message_id.clone()),
         ("body_kind", sent.body_kind.clone()),
+        ("delivery", sent.delivery.clone()),
+        (
+            "draft",
+            sent.draft
+                .as_ref()
+                .map(|draft| {
+                    format!(
+                        "{} #{}",
+                        draft.folder,
+                        draft
+                            .uid
+                            .map_or_else(|| "-".to_string(), |uid| uid.to_string())
+                    )
+                })
+                .unwrap_or_else(|| "-".to_string()),
+        ),
     ])
 }
 
