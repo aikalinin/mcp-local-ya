@@ -11,6 +11,7 @@ pub mod doctor;
 pub mod error;
 pub mod goal_router;
 pub mod home;
+pub mod local_paths;
 mod mail;
 mod mail_invite_flow;
 mod mail_link;

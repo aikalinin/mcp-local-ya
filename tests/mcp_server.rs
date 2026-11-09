@@ -935,7 +935,9 @@ client_id = "client-123"
 #[test]
 fn mcp_stdio_mail_send_dry_run_reviews_message_without_network() {
     let temp = tempdir().expect("tempdir");
-    let attachment_path = temp.path().join("invoice.txt");
+    let files_temp = tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    let attachment_path = files_dir.join("invoice.txt");
     fs::write(&attachment_path, "invoice body").expect("attachment");
     write_mock_mail_account(temp.path());
     write_credentials_file(
@@ -976,6 +978,7 @@ client_id = "client-123"
 
     let output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -998,7 +1001,9 @@ client_id = "client-123"
 #[test]
 fn mcp_stdio_mail_send_link_dry_run_reviews_upload_publish_and_mail_without_network() {
     let temp = tempdir().expect("tempdir");
-    let source_path = temp.path().join("archive.zip");
+    let files_temp = tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    let source_path = files_dir.join("archive.zip");
     fs::write(&source_path, "archive body").expect("source");
     write_accounts_file(
         temp.path(),
@@ -1077,6 +1082,7 @@ client_id = "client-123"
 
     let output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -1105,8 +1111,10 @@ client_id = "client-123"
 #[test]
 fn mcp_stdio_mail_send_link_returns_partial_recovery_when_smtp_fails_after_publish() {
     let temp = tempdir().expect("tempdir");
+    let files_temp = tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
     let mut server = Server::new();
-    let source_path = temp.path().join("archive.zip");
+    let source_path = files_dir.join("archive.zip");
     fs::write(&source_path, "archive body").expect("source");
     write_accounts_file(
         temp.path(),
@@ -1239,6 +1247,7 @@ client_id = "client-123"
 
     let output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -1261,6 +1270,7 @@ client_id = "client-123"
 
     let activity = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -1276,7 +1286,9 @@ client_id = "client-123"
 #[test]
 fn mcp_stdio_mail_send_dry_run_recommends_send_link_for_oversized_attachment() {
     let temp = tempdir().expect("tempdir");
-    let attachment_path = temp.path().join("archive.zip");
+    let files_temp = tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    let attachment_path = files_dir.join("archive.zip");
     fs::write(&attachment_path, vec![b'x'; 20 * 1024 * 1024]).expect("attachment");
     write_accounts_file(
         temp.path(),
@@ -1345,6 +1357,7 @@ client_id = "client-123"
 
     let output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -1541,6 +1554,8 @@ client_id = "client-123"
 #[test]
 fn mcp_stdio_mail_send_rejects_directory_attachment_before_network() {
     let temp = tempdir().expect("tempdir");
+    let files_temp = tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
     write_mock_mail_account(temp.path());
     write_credentials_file(
         temp.path(),
@@ -1559,6 +1574,7 @@ client_id = "client-123"
 
     let output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(
             [
@@ -1574,7 +1590,7 @@ client_id = "client-123"
                             "to": "person@example.com",
                             "subject": "Hello",
                             "text": "Body",
-                            "attachments": [temp.path().display().to_string()]
+                            "attachments": [files_dir.display().to_string()]
                         }
                     }),
                 ),
@@ -1991,6 +2007,8 @@ secret = "calendar-secret"
 #[test]
 fn mcp_stdio_exposes_disk_write_tools_and_executes_mkdir_upload() {
     let temp = tempdir().expect("tempdir");
+    let files_temp = tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
     let mut disk = Server::new();
     write_mock_disk_account(temp.path(), &disk.url());
     write_credentials_file(
@@ -2008,7 +2026,7 @@ client_id = "client-123"
 "#,
     );
 
-    let source_path = temp.path().join("note.txt");
+    let source_path = files_dir.join("note.txt");
     fs::write(&source_path, b"hello disk").expect("source file");
 
     let _mkdir = disk
@@ -2138,6 +2156,7 @@ client_id = "client-123"
 
     let output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -2218,6 +2237,7 @@ client_id = "client-123"
 
     let activity_output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["activity", "list", "--limit", "5"])
         .assert()
         .success()
@@ -2247,6 +2267,7 @@ client_id = "client-123"
 
     let detail_output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(detail_input)
         .assert()
@@ -2278,8 +2299,10 @@ client_id = "client-123"
 #[test]
 fn mcp_stdio_exposes_disk_download_tool_and_downloads_private_file() {
     let temp = tempdir().expect("tempdir");
+    let files_temp = tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
     let mut server = Server::new();
-    let output_path = temp.path().join("downloads").join("guide.pdf");
+    let output_path = files_dir.join("downloads").join("guide.pdf");
     let body = b"%PDF-1.4\nprivate pdf\n";
 
     write_accounts_file(
@@ -2401,6 +2424,7 @@ client_id = "client-123"
 
     let output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .env("YACLI_DISK_TOKEN", "disk-token")
         .args(["mcp"])
         .write_stdin(input)
@@ -3039,7 +3063,9 @@ client_id = "client-123"
 #[test]
 fn mcp_stdio_disk_upload_dry_run_reviews_file_without_network_write() {
     let temp = tempdir().expect("tempdir");
-    let source_path = temp.path().join("note.txt");
+    let files_temp = tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    let source_path = files_dir.join("note.txt");
     fs::write(&source_path, b"hello disk").expect("source file");
 
     write_mock_disk_account(temp.path(), "https://cloud-api.yandex.net");
@@ -3079,6 +3105,7 @@ client_id = "client-123"
 
     let output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3098,7 +3125,9 @@ client_id = "client-123"
 #[test]
 fn mcp_stdio_disk_upload_link_dry_run_reviews_upload_and_publish_without_network_write() {
     let temp = tempdir().expect("tempdir");
-    let source_path = temp.path().join("note.txt");
+    let files_temp = tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    let source_path = files_dir.join("note.txt");
     fs::write(&source_path, b"hello disk").expect("source file");
 
     write_mock_disk_account(temp.path(), "https://cloud-api.yandex.net");
@@ -3138,6 +3167,7 @@ client_id = "client-123"
 
     let output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()

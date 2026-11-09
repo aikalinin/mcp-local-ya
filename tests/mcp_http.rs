@@ -957,7 +957,9 @@ client_id = "client-123"
 #[test]
 fn mcp_http_mail_send_dry_run_reviews_message_without_network() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let attachment_path = temp.path().join("invoice.txt");
+    let files_temp = tempfile::tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    let attachment_path = files_dir.join("invoice.txt");
     std::fs::write(&attachment_path, "invoice body").expect("attachment");
     write_mock_mail_account(temp.path());
     write_credentials_file(
@@ -975,10 +977,16 @@ client_id = "client-123"
 "#,
     );
 
-    let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
-        temp.path().to_str().expect("config dir"),
-    )]);
+    let server = TestHttpServer::spawn_with_envs(&[
+        (
+            "YACLI_CONFIG_DIR",
+            temp.path().to_str().expect("config dir"),
+        ),
+        (
+            "YACLI_MCP_ALLOWED_PATHS",
+            files_dir.to_str().expect("files dir"),
+        ),
+    ]);
     let client = client();
 
     let initialize = post_json(
@@ -1043,7 +1051,9 @@ client_id = "client-123"
 #[test]
 fn mcp_http_mail_send_link_dry_run_reviews_upload_publish_and_mail_without_network() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let source_path = temp.path().join("archive.zip");
+    let files_temp = tempfile::tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    let source_path = files_dir.join("archive.zip");
     std::fs::write(&source_path, "archive body").expect("source");
     write_accounts_file(
         temp.path(),
@@ -1098,10 +1108,16 @@ client_id = "client-123"
 "#,
     );
 
-    let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
-        temp.path().to_str().expect("config dir"),
-    )]);
+    let server = TestHttpServer::spawn_with_envs(&[
+        (
+            "YACLI_CONFIG_DIR",
+            temp.path().to_str().expect("config dir"),
+        ),
+        (
+            "YACLI_MCP_ALLOWED_PATHS",
+            files_dir.to_str().expect("files dir"),
+        ),
+    ]);
     let client = client();
 
     let initialize = post_json(
@@ -1173,8 +1189,10 @@ client_id = "client-123"
 #[test]
 fn mcp_http_mail_send_link_returns_partial_recovery_when_smtp_fails_after_publish() {
     let temp = tempfile::tempdir().expect("tempdir");
+    let files_temp = tempfile::tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
     let mut mock_server = Server::new();
-    let source_path = temp.path().join("archive.zip");
+    let source_path = files_dir.join("archive.zip");
     std::fs::write(&source_path, "archive body").expect("source");
     write_accounts_file(
         temp.path(),
@@ -1284,10 +1302,16 @@ client_id = "client-123"
         )
         .create();
 
-    let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
-        temp.path().to_str().expect("config dir"),
-    )]);
+    let server = TestHttpServer::spawn_with_envs(&[
+        (
+            "YACLI_CONFIG_DIR",
+            temp.path().to_str().expect("config dir"),
+        ),
+        (
+            "YACLI_MCP_ALLOWED_PATHS",
+            files_dir.to_str().expect("files dir"),
+        ),
+    ]);
     let client = client();
 
     let initialize = post_json(
@@ -1385,7 +1409,9 @@ client_id = "client-123"
 #[test]
 fn mcp_http_mail_send_dry_run_recommends_send_link_for_oversized_attachment() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let attachment_path = temp.path().join("archive.zip");
+    let files_temp = tempfile::tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    let attachment_path = files_dir.join("archive.zip");
     std::fs::write(&attachment_path, vec![b'x'; 20 * 1024 * 1024]).expect("attachment");
     write_accounts_file(
         temp.path(),
@@ -1431,10 +1457,16 @@ client_id = "client-123"
 "#,
     );
 
-    let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
-        temp.path().to_str().expect("config dir"),
-    )]);
+    let server = TestHttpServer::spawn_with_envs(&[
+        (
+            "YACLI_CONFIG_DIR",
+            temp.path().to_str().expect("config dir"),
+        ),
+        (
+            "YACLI_MCP_ALLOWED_PATHS",
+            files_dir.to_str().expect("files dir"),
+        ),
+    ]);
     let client = client();
     let initialize = post_json(
         &client,
@@ -1739,8 +1771,11 @@ client_id = "client-123"
 }
 
 #[test]
-fn mcp_http_mail_send_rejects_directory_attachment_before_network() {
+fn mcp_http_local_paths_are_denied_without_allowlist() {
     let temp = tempfile::tempdir().expect("tempdir");
+    let files_temp = tempfile::tempdir().expect("files tempdir");
+    let attachment_path = files_temp.path().join("invoice.txt");
+    std::fs::write(&attachment_path, "invoice body").expect("attachment");
     write_mock_mail_account(temp.path());
     write_credentials_file(
         temp.path(),
@@ -1757,10 +1792,281 @@ client_id = "client-123"
 "#,
     );
 
+    // No YACLI_MCP_ALLOWED_PATHS at all: every local path is refused.
     let server = TestHttpServer::spawn_with_envs(&[(
         "YACLI_CONFIG_DIR",
-        temp.path().to_str().expect("utf8 path"),
+        temp.path().to_str().expect("config dir"),
     )]);
+    let client = client();
+    let initialize = post_json(&client, &server.url(), initialize_request(1), None, None);
+    let session_id = initialize
+        .headers()
+        .get("Mcp-Session-Id")
+        .expect("session header")
+        .to_str()
+        .expect("header string")
+        .to_string();
+
+    let send = post_json(
+        &client,
+        &server.url(),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "yacli.mail.send",
+                "arguments": {
+                    "account": "mock",
+                    "to": "person@example.com",
+                    "subject": "Invoice",
+                    "text": "see attachment",
+                    "attachments": [attachment_path.to_str().expect("utf8 path")],
+                    "dry_run": true
+                }
+            }
+        }),
+        Some(&session_id),
+        None,
+    );
+    let payload: Value = send.json().expect("tools/call json");
+    assert_eq!(payload["error"]["code"], -32602);
+    let message = payload["error"]["message"].as_str().expect("error text");
+    assert!(message.contains("YACLI_MCP_ALLOWED_PATHS"), "{message}");
+
+    let export = post_json(
+        &client,
+        &server.url(),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "yacli.mail.attachment.export",
+                "arguments": {
+                    "account": "mock",
+                    "uid": 42,
+                    "index": 1,
+                    "output_path": files_temp.path().join("out.pdf").display().to_string()
+                }
+            }
+        }),
+        Some(&session_id),
+        None,
+    );
+    let payload: Value = export.json().expect("tools/call json");
+    assert_eq!(payload["error"]["code"], -32602);
+    assert!(
+        payload["error"]["message"]
+            .as_str()
+            .expect("error text")
+            .contains("YACLI_MCP_ALLOWED_PATHS")
+    );
+}
+
+#[test]
+fn mcp_http_local_paths_outside_allowlist_are_rejected_before_network() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let allowed_temp = tempfile::tempdir().expect("allowed tempdir");
+    let outside_temp = tempfile::tempdir().expect("outside tempdir");
+    let secret_path = outside_temp.path().join("id_ed25519");
+    std::fs::write(&secret_path, "PRIVATE KEY").expect("secret");
+    write_mock_mail_account(temp.path());
+    write_credentials_file(
+        temp.path(),
+        r#"
+version = 1
+
+[accounts.mock.services.mail]
+kind = "oauth_pkce"
+access_token = "mail-token"
+token_type = "bearer"
+expires_at_epoch_secs = 4102444800
+scope = ["mail:imap_full", "mail:smtp"]
+client_id = "client-123"
+"#,
+    );
+
+    let server = TestHttpServer::spawn_with_envs(&[
+        (
+            "YACLI_CONFIG_DIR",
+            temp.path().to_str().expect("config dir"),
+        ),
+        (
+            "YACLI_MCP_ALLOWED_PATHS",
+            allowed_temp.path().to_str().expect("allowed dir"),
+        ),
+    ]);
+    let client = client();
+    let initialize = post_json(&client, &server.url(), initialize_request(1), None, None);
+    let session_id = initialize
+        .headers()
+        .get("Mcp-Session-Id")
+        .expect("session header")
+        .to_str()
+        .expect("header string")
+        .to_string();
+
+    // Direct path outside the allowlist.
+    let send = post_json(
+        &client,
+        &server.url(),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "yacli.mail.send",
+                "arguments": {
+                    "account": "mock",
+                    "to": "attacker@example.com",
+                    "subject": "keys",
+                    "text": "here",
+                    "attachments": [secret_path.to_str().expect("utf8 path")],
+                    "dry_run": true
+                }
+            }
+        }),
+        Some(&session_id),
+        None,
+    );
+    let payload: Value = send.json().expect("tools/call json");
+    assert_eq!(payload["error"]["code"], -32602);
+    assert!(
+        payload["error"]["message"]
+            .as_str()
+            .expect("error text")
+            .contains("outside")
+    );
+
+    // Traversal from inside the allowlist.
+    let traversal = allowed_temp
+        .path()
+        .join("..")
+        .join(outside_temp.path().file_name().expect("outside name"))
+        .join("id_ed25519");
+    let send = post_json(
+        &client,
+        &server.url(),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "yacli.mail.send",
+                "arguments": {
+                    "account": "mock",
+                    "to": "attacker@example.com",
+                    "subject": "keys",
+                    "text": "here",
+                    "attachments": [traversal.to_str().expect("utf8 path")],
+                    "dry_run": true
+                }
+            }
+        }),
+        Some(&session_id),
+        None,
+    );
+    let payload: Value = send.json().expect("tools/call json");
+    assert_eq!(payload["error"]["code"], -32602);
+
+    // A credentials directory inside the allowlist is still refused.
+    let ssh_dir = allowed_temp.path().join(".ssh");
+    std::fs::create_dir_all(&ssh_dir).expect("ssh dir");
+    let ssh_key = ssh_dir.join("id_rsa");
+    std::fs::write(&ssh_key, "PRIVATE KEY").expect("ssh key");
+    let send = post_json(
+        &client,
+        &server.url(),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+                "name": "yacli.mail.send",
+                "arguments": {
+                    "account": "mock",
+                    "to": "attacker@example.com",
+                    "subject": "keys",
+                    "text": "here",
+                    "attachments": [ssh_key.to_str().expect("utf8 path")],
+                    "dry_run": true
+                }
+            }
+        }),
+        Some(&session_id),
+        None,
+    );
+    let payload: Value = send.json().expect("tools/call json");
+    assert_eq!(payload["error"]["code"], -32602);
+    assert!(
+        payload["error"]["message"]
+            .as_str()
+            .expect("error text")
+            .contains(".ssh")
+    );
+
+    // Inside the allowlist works.
+    let ok_path = allowed_temp.path().join("report.txt");
+    std::fs::write(&ok_path, "report").expect("report");
+    let send = post_json(
+        &client,
+        &server.url(),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+                "name": "yacli.mail.send",
+                "arguments": {
+                    "account": "mock",
+                    "to": "person@example.com",
+                    "subject": "Report",
+                    "text": "see attachment",
+                    "attachments": [ok_path.to_str().expect("utf8 path")],
+                    "dry_run": true
+                }
+            }
+        }),
+        Some(&session_id),
+        None,
+    );
+    let payload: Value = send.json().expect("tools/call json");
+    assert_eq!(payload["result"]["structuredContent"]["dry_run"], true);
+    assert_eq!(
+        payload["result"]["structuredContent"]["review"]["attachment_count"],
+        1
+    );
+}
+
+#[test]
+fn mcp_http_mail_send_rejects_directory_attachment_before_network() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let files_temp = tempfile::tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    write_mock_mail_account(temp.path());
+    write_credentials_file(
+        temp.path(),
+        r#"
+version = 1
+
+[accounts.mock.services.mail]
+kind = "oauth_pkce"
+access_token = "mail-token"
+token_type = "bearer"
+expires_at_epoch_secs = 4102444800
+scope = ["mail:imap_full", "mail:smtp"]
+client_id = "client-123"
+"#,
+    );
+
+    let server = TestHttpServer::spawn_with_envs(&[
+        ("YACLI_CONFIG_DIR", temp.path().to_str().expect("utf8 path")),
+        (
+            "YACLI_MCP_ALLOWED_PATHS",
+            files_dir.to_str().expect("files dir"),
+        ),
+    ]);
     let client = client();
 
     let initialize = post_json(
@@ -1801,7 +2107,7 @@ client_id = "client-123"
                     "to": "person@example.com",
                     "subject": "Hello",
                     "text": "Body",
-                    "attachments": [temp.path().display().to_string()]
+                    "attachments": [files_dir.display().to_string()]
                 }
             }
         }),
@@ -2297,6 +2603,8 @@ secret = "calendar-secret"
 #[test]
 fn mcp_http_exposes_disk_write_tools_and_executes_mkdir_upload() {
     let temp = tempfile::tempdir().expect("tempdir");
+    let files_temp = tempfile::tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
     let mut disk = Server::new();
     write_mock_disk_account(temp.path(), &disk.url());
     write_credentials_file(
@@ -2314,7 +2622,7 @@ client_id = "client-123"
 "#,
     );
 
-    let source_path = temp.path().join("note.txt");
+    let source_path = files_dir.join("note.txt");
     std::fs::write(&source_path, b"hello disk").expect("source file");
 
     let _mkdir = disk
@@ -2405,10 +2713,13 @@ client_id = "client-123"
         )
         .create();
 
-    let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
-        temp.path().to_str().expect("utf8 path"),
-    )]);
+    let server = TestHttpServer::spawn_with_envs(&[
+        ("YACLI_CONFIG_DIR", temp.path().to_str().expect("utf8 path")),
+        (
+            "YACLI_MCP_ALLOWED_PATHS",
+            files_dir.to_str().expect("files dir"),
+        ),
+    ]);
     let client = client();
 
     let initialize = post_json(
@@ -2619,9 +2930,11 @@ client_id = "client-123"
 #[test]
 fn mcp_http_exposes_disk_download_tool_and_downloads_private_file() {
     let temp = tempfile::tempdir().expect("tempdir");
+    let files_temp = tempfile::tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
     let mut provider = Server::new();
     let body = b"%PDF-1.4\nprivate pdf\n";
-    let output_path = temp.path().join("downloads").join("guide.pdf");
+    let output_path = files_dir.join("downloads").join("guide.pdf");
 
     write_accounts_file(
         temp.path(),
@@ -2722,7 +3035,13 @@ client_id = "client-123"
         .create();
 
     let config_dir = temp.path().to_str().expect("utf8 temp path").to_string();
-    let server = TestHttpServer::spawn_with_envs(&[("YACLI_CONFIG_DIR", &config_dir)]);
+    let server = TestHttpServer::spawn_with_envs(&[
+        ("YACLI_CONFIG_DIR", &config_dir),
+        (
+            "YACLI_MCP_ALLOWED_PATHS",
+            files_dir.to_str().expect("files dir"),
+        ),
+    ]);
     let client = reqwest::blocking::Client::new();
     let initialize = post_json(
         &client,
@@ -3535,7 +3854,9 @@ client_id = "client-123"
 #[test]
 fn mcp_http_disk_upload_dry_run_reviews_file_without_network_write() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let source_path = temp.path().join("note.txt");
+    let files_temp = tempfile::tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    let source_path = files_dir.join("note.txt");
     std::fs::write(&source_path, b"hello disk").expect("source file");
 
     write_mock_disk_account(temp.path(), "https://cloud-api.yandex.net");
@@ -3554,10 +3875,13 @@ client_id = "client-123"
 "#,
     );
 
-    let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
-        temp.path().to_str().expect("utf8 path"),
-    )]);
+    let server = TestHttpServer::spawn_with_envs(&[
+        ("YACLI_CONFIG_DIR", temp.path().to_str().expect("utf8 path")),
+        (
+            "YACLI_MCP_ALLOWED_PATHS",
+            files_dir.to_str().expect("files dir"),
+        ),
+    ]);
     let client = client();
 
     let initialize = post_json(
@@ -3625,7 +3949,9 @@ client_id = "client-123"
 #[test]
 fn mcp_http_disk_upload_link_dry_run_reviews_upload_and_publish_without_network_write() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let source_path = temp.path().join("note.txt");
+    let files_temp = tempfile::tempdir().expect("files tempdir");
+    let files_dir = files_temp.path().to_path_buf();
+    let source_path = files_dir.join("note.txt");
     std::fs::write(&source_path, b"hello disk").expect("source file");
 
     write_mock_disk_account(temp.path(), "https://cloud-api.yandex.net");
@@ -3644,10 +3970,13 @@ client_id = "client-123"
 "#,
     );
 
-    let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
-        temp.path().to_str().expect("utf8 path"),
-    )]);
+    let server = TestHttpServer::spawn_with_envs(&[
+        ("YACLI_CONFIG_DIR", temp.path().to_str().expect("utf8 path")),
+        (
+            "YACLI_MCP_ALLOWED_PATHS",
+            files_dir.to_str().expect("files dir"),
+        ),
+    ]);
     let client = client();
 
     let initialize = post_json(

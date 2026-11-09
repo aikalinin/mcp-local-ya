@@ -5,6 +5,7 @@ use crate::activity_store::ActivityStore;
 use crate::credential_store::{CredentialStore, configured_secret_backend_name};
 use crate::error::Result;
 use crate::goal_router::goal_route_payload;
+use crate::local_paths::{ALLOWED_PATHS_ENV, configured_allowed_paths};
 use crate::mcp::install::mcp_client_readiness;
 use crate::onboarding::onboarding_resource_payload;
 use crate::paths::{accounts_path, activity_log_path, config_dir, credentials_path};
@@ -51,6 +52,7 @@ pub fn doctor_payload(requested_account: Option<&str>, goal: Option<&str>) -> Re
             "yacli activity list",
         ),
         secret_backend_check(secret_backend, credentials_path.exists()),
+        mcp_local_paths_check(),
         mcp_install_check(&mcp_clients),
     ];
 
@@ -153,6 +155,7 @@ pub fn doctor_payload(requested_account: Option<&str>, goal: Option<&str>) -> Re
             "credentialsPath": credentials_path,
             "activityLogPath": activity_log_path,
             "secretBackend": secret_backend,
+            "mcpAllowedPaths": configured_allowed_paths(),
         },
         "current_account": current_account,
         "email": email,
@@ -216,6 +219,30 @@ fn secret_backend_check(secret_backend: &str, credentials_file_present: bool) ->
             "yacli status"
         },
     })
+}
+
+fn mcp_local_paths_check() -> Value {
+    match configured_allowed_paths() {
+        Some(paths) => json!({
+            "id": "mcp_local_paths",
+            "title": "Локальные файлы для MCP",
+            "status": "completed",
+            "detail": format!(
+                "MCP-инструменты могут читать и писать файлы только внутри: {}",
+                paths.join(", ")
+            ),
+            "recommended_command": "yacli doctor",
+        }),
+        None => json!({
+            "id": "mcp_local_paths",
+            "title": "Локальные файлы для MCP",
+            "status": "attention",
+            "detail": format!(
+                "{ALLOWED_PATHS_ENV} не задан: MCP-инструменты не имеют доступа к локальным файлам (attachments, disk upload/download, attachment export). Это безопасное значение по умолчанию; задайте переменную, если агенту нужны файлы."
+            ),
+            "recommended_command": "export YACLI_MCP_ALLOWED_PATHS=\"$HOME/Downloads\"",
+        }),
+    }
 }
 
 fn service_check(

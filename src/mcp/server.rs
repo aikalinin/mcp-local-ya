@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, hash_map::DefaultHasher};
 use std::convert::Infallible;
 use std::hash::{Hash, Hasher};
 use std::io::{self, BufRead, BufReader, Write};
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
@@ -31,6 +30,7 @@ use crate::doctor::doctor_payload;
 use crate::error::{Result, YacliError};
 use crate::goal_router::goal_route_payload;
 use crate::home::home_payload;
+use crate::local_paths::{LocalAccess, resolve_mcp_local_path, resolve_mcp_local_paths};
 use crate::mail_invite_flow::{
     invite_create_event_command, partial_failure as invite_create_event_partial_failure,
 };
@@ -2553,13 +2553,8 @@ fn activity_undo(id: &str) -> Result<Value> {
 
 fn mail_send(account: Option<&str>, request: MailSendToolRequest) -> Result<Value> {
     let (resolved_account, auth, context) = resolve_mail_private_context(account)?;
-    let attachments = load_mail_attachments(
-        &request
-            .attachment_paths
-            .iter()
-            .map(PathBuf::from)
-            .collect::<Vec<_>>(),
-    )?;
+    let attachment_paths = resolve_mcp_local_paths(&request.attachment_paths, LocalAccess::Read)?;
+    let attachments = load_mail_attachments(&attachment_paths)?;
     let send_request = crate::mail::MailSendRequest {
         to: vec![request.to],
         cc: request.cc,
@@ -2615,7 +2610,7 @@ fn mail_send_link(account: Option<&str>, request: MailSendLinkToolRequest) -> Re
     let (resolved_account, disk_base_url, access_token) = resolve_disk_private_context(account)?;
     let (_, auth, context) = resolve_mail_private_context(account)?;
     let send_link_request = MailSendLinkRequest {
-        source: PathBuf::from(&request.source_path),
+        source: resolve_mcp_local_path(&request.source_path, LocalAccess::Read)?,
         disk_path: request.disk_path,
         overwrite: request.overwrite,
         to: vec![request.to],
@@ -2824,7 +2819,7 @@ fn mail_attachment_export(
         MailAttachmentExportRequest {
             uid: request.uid,
             selector: request.selector,
-            output: PathBuf::from(&request.output),
+            output: resolve_mcp_local_path(&request.output, LocalAccess::Write)?,
             force: request.force,
             max_bytes: request.max_bytes,
         },
@@ -3126,7 +3121,7 @@ fn disk_upload(account: Option<&str>, request: DiskUploadToolRequest) -> Result<
     let (resolved_account, base_url, access_token) = resolve_disk_private_context(account)?;
     let dry_run = request.dry_run;
     let upload_request = PrivateDiskUploadRequest {
-        source: PathBuf::from(request.source),
+        source: resolve_mcp_local_path(&request.source, LocalAccess::Read)?,
         path: request.path,
         overwrite: request.overwrite,
     };
@@ -3170,7 +3165,7 @@ fn disk_upload(account: Option<&str>, request: DiskUploadToolRequest) -> Result<
 fn disk_upload_link(account: Option<&str>, request: DiskUploadLinkToolRequest) -> Result<Value> {
     let (resolved_account, base_url, access_token) = resolve_disk_private_context(account)?;
     let upload_link_request = DiskUploadLinkRequest {
-        source: PathBuf::from(&request.source),
+        source: resolve_mcp_local_path(&request.source, LocalAccess::Read)?,
         disk_path: request.path.clone(),
         overwrite: request.overwrite,
     };
@@ -3215,7 +3210,7 @@ fn disk_download(account: Option<&str>, request: DiskDownloadToolRequest) -> Res
     let (resolved_account, base_url, access_token) = resolve_disk_private_context(account)?;
     let download_request = PrivateDiskDownloadRequest {
         path: request.path,
-        output: PathBuf::from(request.output_path),
+        output: resolve_mcp_local_path(&request.output_path, LocalAccess::Write)?,
         force: request.force,
     };
     let (resource, download) =
