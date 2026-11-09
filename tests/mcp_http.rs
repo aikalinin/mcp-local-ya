@@ -33,17 +33,17 @@ impl TestHttpServer {
             let addr = listener.local_addr().expect("local addr").to_string();
             drop(listener);
 
-            let mut command = Command::new(cargo_bin("yacli"));
+            let mut command = Command::new(cargo_bin("yamcli"));
             command
                 .args(["mcp", "--transport", "http", "--listen", &addr])
-                .env("YACLI_SECRET_BACKEND", "file")
+                .env("YAMCLI_SECRET_BACKEND", "file")
                 .args(args)
                 .stdout(Stdio::null())
                 .stderr(Stdio::piped());
             for (key, value) in envs {
                 command.env(key, value);
             }
-            let mut child = command.spawn().expect("spawn yacli mcp http");
+            let mut child = command.spawn().expect("spawn yamcli mcp http");
 
             for _ in 0..800 {
                 if let Some(status) = child.try_wait().expect("poll child status") {
@@ -377,19 +377,19 @@ fn mcp_http_initialize_returns_session_header_and_supports_follow_up_requests() 
     let tools = payload["result"]["tools"].as_array().expect("tools array");
     let account_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.account.current")
+        .find(|tool| tool["name"] == "yamcli.account.current")
         .expect("account tool");
     assert_eq!(
         account_tool["_meta"]["ui"]["resourceUri"],
-        "ui://yacli/dashboard"
+        "ui://yamcli/dashboard"
     );
     let update_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.update.check")
+        .find(|tool| tool["name"] == "yamcli.update.check")
         .expect("update tool");
     assert_eq!(
         update_tool["_meta"]["ui"]["resourceUri"],
-        "ui://yacli/dashboard"
+        "ui://yamcli/dashboard"
     );
 
     let prompts_list = post_json(
@@ -502,7 +502,7 @@ fn mcp_http_renders_prompt_messages() {
         .expect("prompt text");
     assert!(text.contains("UID письма: 42"));
     assert!(text.contains("Аккаунт: work"));
-    assert!(text.contains("используй `yacli.mail.reply`"));
+    assert!(text.contains("используй `yamcli.mail.reply`"));
 }
 
 #[test]
@@ -511,7 +511,7 @@ fn mcp_http_completes_prompt_and_resource_arguments() {
     write_mock_mail_account(temp.path());
 
     let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
+        "YAMCLI_CONFIG_DIR",
         temp.path().to_str().expect("utf8 path"),
     )]);
     let client = client();
@@ -574,7 +574,7 @@ fn mcp_http_completes_prompt_and_resource_arguments() {
             "params": {
                 "ref": {
                     "type": "ref/resource",
-                    "uri": "resource://yacli/account/{account}"
+                    "uri": "resource://yamcli/account/{account}"
                 },
                 "argument": {
                     "name": "account",
@@ -601,11 +601,11 @@ fn mcp_http_completes_prompt_and_resource_arguments() {
             "params": {
                 "ref": {
                     "type": "ref/resource",
-                    "uri": "resource://yacli/skill/{skill}"
+                    "uri": "resource://yamcli/skill/{skill}"
                 },
                 "argument": {
                     "name": "skill",
-                    "value": "yacli-ma"
+                    "value": "yamcli-ma"
                 }
             }
         }),
@@ -615,7 +615,7 @@ fn mcp_http_completes_prompt_and_resource_arguments() {
     let skill_payload: Value = skill_completion.json().expect("completion json");
     assert_eq!(
         skill_payload["result"]["completion"]["values"][0],
-        "yacli-mail"
+        "yamcli-mail"
     );
 }
 
@@ -668,7 +668,7 @@ fn mcp_http_requests_client_roots_via_post_sse() {
     assert!(tools_list.status().is_success());
     let payload: Value = tools_list.json().expect("tools/list json");
     let tools = payload["result"]["tools"].as_array().expect("tools array");
-    assert!(tools.iter().any(|tool| tool["name"] == "yacli.roots.list"));
+    assert!(tools.iter().any(|tool| tool["name"] == "yamcli.roots.list"));
 
     let sse = post_json_sse(
         &client,
@@ -678,7 +678,7 @@ fn mcp_http_requests_client_roots_via_post_sse() {
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.roots.list",
+                "name": "yamcli.roots.list",
                 "arguments": {}
             }
         }),
@@ -759,7 +759,7 @@ fn mcp_http_roots_tool_requires_post_sse_accept_header() {
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.roots.list",
+                "name": "yamcli.roots.list",
                 "arguments": {}
             }
         }),
@@ -789,7 +789,7 @@ client_id = "client-123"
     );
 
     let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
+        "YAMCLI_CONFIG_DIR",
         temp.path().to_str().expect("utf8 path"),
     )]);
     let client = client();
@@ -840,32 +840,32 @@ client_id = "client-123"
     let tools = tools_payload["result"]["tools"]
         .as_array()
         .expect("tools array");
-    assert!(tools.iter().any(|tool| tool["name"] == "yacli.mail.send"));
+    assert!(tools.iter().any(|tool| tool["name"] == "yamcli.mail.send"));
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.mail.send_link")
+            .any(|tool| tool["name"] == "yamcli.mail.send_link")
     );
-    assert!(tools.iter().any(|tool| tool["name"] == "yacli.mail.reply"));
+    assert!(tools.iter().any(|tool| tool["name"] == "yamcli.mail.reply"));
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.mail.forward")
-    );
-    assert!(
-        tools
-            .iter()
-            .any(|tool| tool["name"] == "yacli.mail.attachment.export")
+            .any(|tool| tool["name"] == "yamcli.mail.forward")
     );
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.mail.invite.inspect")
+            .any(|tool| tool["name"] == "yamcli.mail.attachment.export")
     );
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.mail.invite.create_event")
+            .any(|tool| tool["name"] == "yamcli.mail.invite.inspect")
+    );
+    assert!(
+        tools
+            .iter()
+            .any(|tool| tool["name"] == "yamcli.mail.invite.create_event")
     );
 
     let send = post_json(
@@ -876,7 +876,7 @@ client_id = "client-123"
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "broken-recipient",
@@ -901,7 +901,7 @@ client_id = "client-123"
 
     let attachment_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.mail.attachment.export")
+        .find(|tool| tool["name"] == "yamcli.mail.attachment.export")
         .expect("attachment export tool");
     assert_eq!(
         attachment_tool["inputSchema"]["required"],
@@ -909,7 +909,7 @@ client_id = "client-123"
     );
     let send_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.mail.send")
+        .find(|tool| tool["name"] == "yamcli.mail.send")
         .expect("send tool");
     assert_eq!(
         send_tool["inputSchema"]["properties"]["attachments"]["type"],
@@ -921,7 +921,7 @@ client_id = "client-123"
     );
     let send_link_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.mail.send_link")
+        .find(|tool| tool["name"] == "yamcli.mail.send_link")
         .expect("send-link tool");
     assert_eq!(
         send_link_tool["inputSchema"]["required"],
@@ -933,12 +933,12 @@ client_id = "client-123"
     );
     let invite_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.mail.invite.inspect")
+        .find(|tool| tool["name"] == "yamcli.mail.invite.inspect")
         .expect("invite inspect tool");
     assert_eq!(invite_tool["inputSchema"]["required"], json!(["uid"]));
     let invite_create_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.mail.invite.create_event")
+        .find(|tool| tool["name"] == "yamcli.mail.invite.create_event")
         .expect("invite create tool");
     assert_eq!(
         invite_create_tool["inputSchema"]["required"],
@@ -946,7 +946,7 @@ client_id = "client-123"
     );
     let calendar_create_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.calendar.create")
+        .find(|tool| tool["name"] == "yamcli.calendar.create")
         .expect("calendar create tool");
     assert_eq!(
         calendar_create_tool["inputSchema"]["properties"]["dry_run"]["type"],
@@ -979,11 +979,11 @@ client_id = "client-123"
 
     let server = TestHttpServer::spawn_with_envs(&[
         (
-            "YACLI_CONFIG_DIR",
+            "YAMCLI_CONFIG_DIR",
             temp.path().to_str().expect("config dir"),
         ),
         (
-            "YACLI_MCP_ALLOWED_PATHS",
+            "YAMCLI_MCP_ALLOWED_PATHS",
             files_dir.to_str().expect("files dir"),
         ),
     ]);
@@ -1022,7 +1022,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -1110,11 +1110,11 @@ client_id = "client-123"
 
     let server = TestHttpServer::spawn_with_envs(&[
         (
-            "YACLI_CONFIG_DIR",
+            "YAMCLI_CONFIG_DIR",
             temp.path().to_str().expect("config dir"),
         ),
         (
-            "YACLI_MCP_ALLOWED_PATHS",
+            "YAMCLI_MCP_ALLOWED_PATHS",
             files_dir.to_str().expect("files dir"),
         ),
     ]);
@@ -1152,7 +1152,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send_link",
+                "name": "yamcli.mail.send_link",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -1304,14 +1304,14 @@ client_id = "client-123"
 
     let server = TestHttpServer::spawn_with_envs(&[
         (
-            "YACLI_CONFIG_DIR",
+            "YAMCLI_CONFIG_DIR",
             temp.path().to_str().expect("config dir"),
         ),
         (
-            "YACLI_MCP_ALLOWED_PATHS",
+            "YAMCLI_MCP_ALLOWED_PATHS",
             files_dir.to_str().expect("files dir"),
         ),
-        ("YACLI_MCP_SEND_POLICY", "send"),
+        ("YAMCLI_MCP_SEND_POLICY", "send"),
     ]);
     let client = client();
 
@@ -1347,7 +1347,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send_link",
+                "name": "yamcli.mail.send_link",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -1372,7 +1372,7 @@ client_id = "client-123"
     );
     assert_eq!(
         structured["partial"]["recovery"]["retry_mail_step"]["tool"],
-        "yacli.mail.send_published_link"
+        "yamcli.mail.send_published_link"
     );
 
     let activity_resource = post_json(
@@ -1383,7 +1383,7 @@ client_id = "client-123"
             "id": 3,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/activity"
+                "uri": "resource://yamcli/activity"
             }
         }),
         Some(&session_id),
@@ -1460,11 +1460,11 @@ client_id = "client-123"
 
     let server = TestHttpServer::spawn_with_envs(&[
         (
-            "YACLI_CONFIG_DIR",
+            "YAMCLI_CONFIG_DIR",
             temp.path().to_str().expect("config dir"),
         ),
         (
-            "YACLI_MCP_ALLOWED_PATHS",
+            "YAMCLI_MCP_ALLOWED_PATHS",
             files_dir.to_str().expect("files dir"),
         ),
     ]);
@@ -1502,7 +1502,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -1553,7 +1553,7 @@ client_id = "client-123"
     );
 
     let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
+        "YAMCLI_CONFIG_DIR",
         temp.path().to_str().expect("utf8 path"),
     )]);
     let client = client();
@@ -1590,7 +1590,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.attachment.export",
+                "name": "yamcli.mail.attachment.export",
                 "arguments": {
                     "account": "mock",
                     "uid": 42,
@@ -1609,7 +1609,7 @@ client_id = "client-123"
         payload["error"]["message"]
             .as_str()
             .expect("message")
-            .contains("yacli.mail.attachment.export requires `index` or `name`")
+            .contains("yamcli.mail.attachment.export requires `index` or `name`")
     );
 }
 
@@ -1633,7 +1633,7 @@ client_id = "client-123"
     );
 
     let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
+        "YAMCLI_CONFIG_DIR",
         temp.path().to_str().expect("utf8 path"),
     )]);
     let client = client();
@@ -1670,7 +1670,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.invite.inspect",
+                "name": "yamcli.mail.invite.inspect",
                 "arguments": {
                     "account": "mock",
                     "uid": 42
@@ -1688,7 +1688,7 @@ client_id = "client-123"
         payload["error"]["message"]
             .as_str()
             .expect("message")
-            .contains("yacli.mail.invite.inspect requires `index` or `name`")
+            .contains("yamcli.mail.invite.inspect requires `index` or `name`")
     );
 }
 
@@ -1712,7 +1712,7 @@ client_id = "client-123"
     );
 
     let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
+        "YAMCLI_CONFIG_DIR",
         temp.path().to_str().expect("utf8 path"),
     )]);
     let client = client();
@@ -1749,7 +1749,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.invite.create_event",
+                "name": "yamcli.mail.invite.create_event",
                 "arguments": {
                     "account": "mock",
                     "uid": 42
@@ -1767,7 +1767,7 @@ client_id = "client-123"
         payload["error"]["message"]
             .as_str()
             .expect("message")
-            .contains("yacli.mail.invite.create_event requires `index` or `name`")
+            .contains("yamcli.mail.invite.create_event requires `index` or `name`")
     );
 }
 
@@ -1793,9 +1793,9 @@ client_id = "client-123"
 "#,
     );
 
-    // No YACLI_MCP_ALLOWED_PATHS at all: every local path is refused.
+    // No YAMCLI_MCP_ALLOWED_PATHS at all: every local path is refused.
     let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
+        "YAMCLI_CONFIG_DIR",
         temp.path().to_str().expect("config dir"),
     )]);
     let client = client();
@@ -1816,7 +1816,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -1833,7 +1833,7 @@ client_id = "client-123"
     let payload: Value = send.json().expect("tools/call json");
     assert_eq!(payload["error"]["code"], -32602);
     let message = payload["error"]["message"].as_str().expect("error text");
-    assert!(message.contains("YACLI_MCP_ALLOWED_PATHS"), "{message}");
+    assert!(message.contains("YAMCLI_MCP_ALLOWED_PATHS"), "{message}");
 
     let export = post_json(
         &client,
@@ -1843,7 +1843,7 @@ client_id = "client-123"
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.attachment.export",
+                "name": "yamcli.mail.attachment.export",
                 "arguments": {
                     "account": "mock",
                     "uid": 42,
@@ -1861,7 +1861,7 @@ client_id = "client-123"
         payload["error"]["message"]
             .as_str()
             .expect("error text")
-            .contains("YACLI_MCP_ALLOWED_PATHS")
+            .contains("YAMCLI_MCP_ALLOWED_PATHS")
     );
 }
 
@@ -1890,11 +1890,11 @@ client_id = "client-123"
 
     let server = TestHttpServer::spawn_with_envs(&[
         (
-            "YACLI_CONFIG_DIR",
+            "YAMCLI_CONFIG_DIR",
             temp.path().to_str().expect("config dir"),
         ),
         (
-            "YACLI_MCP_ALLOWED_PATHS",
+            "YAMCLI_MCP_ALLOWED_PATHS",
             allowed_temp.path().to_str().expect("allowed dir"),
         ),
     ]);
@@ -1917,7 +1917,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "attacker@example.com",
@@ -1954,7 +1954,7 @@ client_id = "client-123"
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "attacker@example.com",
@@ -1984,7 +1984,7 @@ client_id = "client-123"
             "id": 4,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "attacker@example.com",
@@ -2018,7 +2018,7 @@ client_id = "client-123"
             "id": 5,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -2062,9 +2062,12 @@ client_id = "client-123"
     );
 
     let server = TestHttpServer::spawn_with_envs(&[
-        ("YACLI_CONFIG_DIR", temp.path().to_str().expect("utf8 path")),
         (
-            "YACLI_MCP_ALLOWED_PATHS",
+            "YAMCLI_CONFIG_DIR",
+            temp.path().to_str().expect("utf8 path"),
+        ),
+        (
+            "YAMCLI_MCP_ALLOWED_PATHS",
             files_dir.to_str().expect("files dir"),
         ),
     ]);
@@ -2102,7 +2105,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -2317,7 +2320,7 @@ END:VCALENDAR]]></c:calendar-data>
         .create();
 
     let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
+        "YAMCLI_CONFIG_DIR",
         temp.path().to_str().expect("utf8 path"),
     )]);
     let client = client();
@@ -2371,12 +2374,12 @@ END:VCALENDAR]]></c:calendar-data>
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.calendar.create")
+            .any(|tool| tool["name"] == "yamcli.calendar.create")
     );
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.calendar.delete")
+            .any(|tool| tool["name"] == "yamcli.calendar.delete")
     );
 
     let create = post_json(
@@ -2387,7 +2390,7 @@ END:VCALENDAR]]></c:calendar-data>
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.calendar.create",
+                "name": "yamcli.calendar.create",
                 "arguments": {
                     "account": "mock",
                     "summary": "Синк команды",
@@ -2417,7 +2420,7 @@ END:VCALENDAR]]></c:calendar-data>
             "id": 4,
             "method": "tools/call",
             "params": {
-                "name": "yacli.calendar.delete",
+                "name": "yamcli.calendar.delete",
                 "arguments": {
                     "account": "mock",
                     "uid": "event-1"
@@ -2526,7 +2529,7 @@ secret = "calendar-secret"
         .create();
 
     let server = TestHttpServer::spawn_with_envs(&[(
-        "YACLI_CONFIG_DIR",
+        "YAMCLI_CONFIG_DIR",
         temp.path().to_str().expect("utf8 path"),
     )]);
     let client = client();
@@ -2568,7 +2571,7 @@ secret = "calendar-secret"
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.calendar.create",
+                "name": "yamcli.calendar.create",
                 "arguments": {
                     "account": "mock",
                     "summary": "Синк команды",
@@ -2715,9 +2718,12 @@ client_id = "client-123"
         .create();
 
     let server = TestHttpServer::spawn_with_envs(&[
-        ("YACLI_CONFIG_DIR", temp.path().to_str().expect("utf8 path")),
         (
-            "YACLI_MCP_ALLOWED_PATHS",
+            "YAMCLI_CONFIG_DIR",
+            temp.path().to_str().expect("utf8 path"),
+        ),
+        (
+            "YAMCLI_MCP_ALLOWED_PATHS",
             files_dir.to_str().expect("files dir"),
         ),
     ]);
@@ -2769,11 +2775,15 @@ client_id = "client-123"
     let tools = tools_payload["result"]["tools"]
         .as_array()
         .expect("tools array");
-    assert!(tools.iter().any(|tool| tool["name"] == "yacli.disk.mkdir"));
-    assert!(tools.iter().any(|tool| tool["name"] == "yacli.disk.upload"));
+    assert!(tools.iter().any(|tool| tool["name"] == "yamcli.disk.mkdir"));
+    assert!(
+        tools
+            .iter()
+            .any(|tool| tool["name"] == "yamcli.disk.upload")
+    );
     let disk_upload_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.disk.upload")
+        .find(|tool| tool["name"] == "yamcli.disk.upload")
         .expect("disk upload tool");
     assert_eq!(
         disk_upload_tool["inputSchema"]["properties"]["dry_run"]["type"],
@@ -2781,7 +2791,7 @@ client_id = "client-123"
     );
     let disk_publish_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.disk.publish")
+        .find(|tool| tool["name"] == "yamcli.disk.publish")
         .expect("disk publish tool");
     assert_eq!(
         disk_publish_tool["inputSchema"]["properties"]["dry_run"]["type"],
@@ -2789,7 +2799,7 @@ client_id = "client-123"
     );
     let disk_unpublish_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.disk.unpublish")
+        .find(|tool| tool["name"] == "yamcli.disk.unpublish")
         .expect("disk unpublish tool");
     assert_eq!(
         disk_unpublish_tool["inputSchema"]["properties"]["dry_run"]["type"],
@@ -2797,7 +2807,7 @@ client_id = "client-123"
     );
     let disk_upload_link_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.disk.upload_link")
+        .find(|tool| tool["name"] == "yamcli.disk.upload_link")
         .expect("disk upload-link tool");
     assert_eq!(
         disk_upload_link_tool["inputSchema"]["properties"]["dry_run"]["type"],
@@ -2812,7 +2822,7 @@ client_id = "client-123"
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.disk.mkdir",
+                "name": "yamcli.disk.mkdir",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/new-folder"
@@ -2836,7 +2846,7 @@ client_id = "client-123"
             "id": 4,
             "method": "tools/call",
             "params": {
-                "name": "yacli.disk.upload",
+                "name": "yamcli.disk.upload",
                 "arguments": {
                     "account": "mock",
                     "source": source_path.to_str().expect("utf8 path"),
@@ -2865,7 +2875,7 @@ client_id = "client-123"
             "id": 5,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/activity"
+                "uri": "resource://yamcli/activity"
             }
         }),
         Some(&session_id),
@@ -2900,7 +2910,7 @@ client_id = "client-123"
             "id": 6,
             "method": "resources/read",
             "params": {
-                "uri": format!("resource://yacli/activity/{activity_id}")
+                "uri": format!("resource://yamcli/activity/{activity_id}")
             }
         }),
         Some(&session_id),
@@ -3037,9 +3047,9 @@ client_id = "client-123"
 
     let config_dir = temp.path().to_str().expect("utf8 temp path").to_string();
     let server = TestHttpServer::spawn_with_envs(&[
-        ("YACLI_CONFIG_DIR", &config_dir),
+        ("YAMCLI_CONFIG_DIR", &config_dir),
         (
-            "YACLI_MCP_ALLOWED_PATHS",
+            "YAMCLI_MCP_ALLOWED_PATHS",
             files_dir.to_str().expect("files dir"),
         ),
     ]);
@@ -3087,7 +3097,7 @@ client_id = "client-123"
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.disk.download")
+            .any(|tool| tool["name"] == "yamcli.disk.download")
     );
 
     let download = post_json(
@@ -3098,7 +3108,7 @@ client_id = "client-123"
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.disk.download",
+                "name": "yamcli.disk.download",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/guide.pdf",
@@ -3185,7 +3195,7 @@ client_id = "client-123"
         .create();
 
     let config_dir = temp.path().to_str().expect("utf8 temp path").to_string();
-    let server = TestHttpServer::spawn_with_envs(&[("YACLI_CONFIG_DIR", &config_dir)]);
+    let server = TestHttpServer::spawn_with_envs(&[("YAMCLI_CONFIG_DIR", &config_dir)]);
     let client = reqwest::blocking::Client::new();
     let initialize = post_json(
         &client,
@@ -3230,7 +3240,7 @@ client_id = "client-123"
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.disk.publish")
+            .any(|tool| tool["name"] == "yamcli.disk.publish")
     );
 
     let publish = post_json(
@@ -3241,7 +3251,7 @@ client_id = "client-123"
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.disk.publish",
+                "name": "yamcli.disk.publish",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/report.pdf"
@@ -3357,7 +3367,7 @@ client_id = "client-123"
         .create();
 
     let config_dir = temp.path().to_str().expect("utf8 temp path").to_string();
-    let server = TestHttpServer::spawn_with_envs(&[("YACLI_CONFIG_DIR", &config_dir)]);
+    let server = TestHttpServer::spawn_with_envs(&[("YAMCLI_CONFIG_DIR", &config_dir)]);
     let client = reqwest::blocking::Client::new();
     let initialize = post_json(
         &client,
@@ -3402,7 +3412,7 @@ client_id = "client-123"
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.activity.undo")
+            .any(|tool| tool["name"] == "yamcli.activity.undo")
     );
 
     let publish = post_json(
@@ -3413,7 +3423,7 @@ client_id = "client-123"
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.disk.publish",
+                "name": "yamcli.disk.publish",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/report.pdf"
@@ -3433,7 +3443,7 @@ client_id = "client-123"
             "id": 4,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/activity"
+                "uri": "resource://yamcli/activity"
             }
         }),
         Some(&session_id),
@@ -3461,7 +3471,7 @@ client_id = "client-123"
             "id": 5,
             "method": "tools/call",
             "params": {
-                "name": "yacli.activity.undo",
+                "name": "yamcli.activity.undo",
                 "arguments": {
                     "id": activity_id
                 }
@@ -3569,7 +3579,7 @@ client_id = "client-123"
         .create();
 
     let config_dir = temp.path().to_str().expect("utf8 temp path").to_string();
-    let server = TestHttpServer::spawn_with_envs(&[("YACLI_CONFIG_DIR", &config_dir)]);
+    let server = TestHttpServer::spawn_with_envs(&[("YAMCLI_CONFIG_DIR", &config_dir)]);
     let client = reqwest::blocking::Client::new();
     let initialize = post_json(
         &client,
@@ -3614,7 +3624,7 @@ client_id = "client-123"
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.disk.unpublish")
+            .any(|tool| tool["name"] == "yamcli.disk.unpublish")
     );
 
     let unpublish = post_json(
@@ -3625,7 +3635,7 @@ client_id = "client-123"
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.disk.unpublish",
+                "name": "yamcli.disk.unpublish",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/report.pdf"
@@ -3696,7 +3706,7 @@ client_id = "client-123"
         .create();
 
     let config_dir = temp.path().to_str().expect("utf8 temp path").to_string();
-    let server = TestHttpServer::spawn_with_envs(&[("YACLI_CONFIG_DIR", &config_dir)]);
+    let server = TestHttpServer::spawn_with_envs(&[("YAMCLI_CONFIG_DIR", &config_dir)]);
     let client = reqwest::blocking::Client::new();
     let initialize = post_json(
         &client,
@@ -3730,7 +3740,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.disk.publish",
+                "name": "yamcli.disk.publish",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/report.pdf",
@@ -3799,7 +3809,7 @@ client_id = "client-123"
         .create();
 
     let config_dir = temp.path().to_str().expect("utf8 temp path").to_string();
-    let server = TestHttpServer::spawn_with_envs(&[("YACLI_CONFIG_DIR", &config_dir)]);
+    let server = TestHttpServer::spawn_with_envs(&[("YAMCLI_CONFIG_DIR", &config_dir)]);
     let client = reqwest::blocking::Client::new();
     let initialize = post_json(
         &client,
@@ -3833,7 +3843,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.disk.unpublish",
+                "name": "yamcli.disk.unpublish",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/report.pdf",
@@ -3877,9 +3887,12 @@ client_id = "client-123"
     );
 
     let server = TestHttpServer::spawn_with_envs(&[
-        ("YACLI_CONFIG_DIR", temp.path().to_str().expect("utf8 path")),
         (
-            "YACLI_MCP_ALLOWED_PATHS",
+            "YAMCLI_CONFIG_DIR",
+            temp.path().to_str().expect("utf8 path"),
+        ),
+        (
+            "YAMCLI_MCP_ALLOWED_PATHS",
             files_dir.to_str().expect("files dir"),
         ),
     ]);
@@ -3923,7 +3936,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.disk.upload",
+                "name": "yamcli.disk.upload",
                 "arguments": {
                     "account": "mock",
                     "source": source_path.to_str().expect("utf8 path"),
@@ -3972,9 +3985,12 @@ client_id = "client-123"
     );
 
     let server = TestHttpServer::spawn_with_envs(&[
-        ("YACLI_CONFIG_DIR", temp.path().to_str().expect("utf8 path")),
         (
-            "YACLI_MCP_ALLOWED_PATHS",
+            "YAMCLI_CONFIG_DIR",
+            temp.path().to_str().expect("utf8 path"),
+        ),
+        (
+            "YAMCLI_MCP_ALLOWED_PATHS",
             files_dir.to_str().expect("files dir"),
         ),
     ]);
@@ -4018,7 +4034,7 @@ client_id = "client-123"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.disk.upload_link",
+                "name": "yamcli.disk.upload_link",
                 "arguments": {
                     "account": "mock",
                     "source": source_path.to_str().expect("utf8 path"),
@@ -4129,9 +4145,9 @@ rest_base_url = "https://cloud-api.yandex.net"
     );
     let config_dir = temp.path().display().to_string();
     let server = TestHttpServer::spawn_with_envs(&[
-        ("YACLI_CONFIG_DIR", &config_dir),
-        ("YACLI_MCP_HTTP_BEARER_TOKEN", "secret-token"),
-        ("YACLI_MCP_HTTP_AUTH_ISSUER", "https://auth.example.test"),
+        ("YAMCLI_CONFIG_DIR", &config_dir),
+        ("YAMCLI_MCP_HTTP_BEARER_TOKEN", "secret-token"),
+        ("YAMCLI_MCP_HTTP_AUTH_ISSUER", "https://auth.example.test"),
     ]);
     let client = client();
     let expected_metadata_url = format!(
@@ -4174,7 +4190,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.auth.status",
+                "name": "yamcli.auth.status",
                 "arguments": {}
             }
         }),
@@ -4190,7 +4206,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             .to_str()
             .expect("header text"),
         format!(
-            "Bearer error=\"invalid_token\", resource_metadata=\"{}\", scope=\"yacli.auth.read\"",
+            "Bearer error=\"invalid_token\", resource_metadata=\"{}\", scope=\"yamcli.auth.read\"",
             expected_metadata_url
         )
     );
@@ -4200,7 +4216,7 @@ rest_base_url = "https://cloud-api.yandex.net"
         unauthorized_payload["resource_metadata"],
         expected_metadata_url
     );
-    assert_eq!(unauthorized_payload["scope"], "yacli.auth.read");
+    assert_eq!(unauthorized_payload["scope"], "yamcli.auth.read");
 
     // Wrong token is rejected the same way as a missing one.
     let wrong_token = post_json_bearer(
@@ -4210,7 +4226,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "jsonrpc": "2.0",
             "id": 2,
             "method": "tools/call",
-            "params": { "name": "yacli.auth.status", "arguments": {} }
+            "params": { "name": "yamcli.auth.status", "arguments": {} }
         }),
         Some(&session_id),
         "secret-tokem",
@@ -4225,7 +4241,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "jsonrpc": "2.0",
             "id": 3,
             "method": "resources/read",
-            "params": { "uri": "resource://yacli/suggestions" }
+            "params": { "uri": "resource://yamcli/suggestions" }
         }),
         Some(&session_id),
         None,
@@ -4240,7 +4256,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "jsonrpc": "2.0",
             "id": 4,
             "method": "tools/call",
-            "params": { "name": "yacli.activity.undo", "arguments": { "id": "x" } }
+            "params": { "name": "yamcli.activity.undo", "arguments": { "id": "x" } }
         }),
         Some(&session_id),
         None,
@@ -4271,7 +4287,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 5,
             "method": "tools/call",
             "params": {
-                "name": "yacli.auth.status",
+                "name": "yamcli.auth.status",
                 "arguments": {}
             }
         }))
@@ -4317,8 +4333,8 @@ smtp_port = 465
     );
     let config_dir = temp.path().display().to_string();
     let server = TestHttpServer::spawn_with_envs(&[
-        ("YACLI_CONFIG_DIR", &config_dir),
-        ("YACLI_MCP_HTTP_BEARER_TOKEN", "secret-token"),
+        ("YAMCLI_CONFIG_DIR", &config_dir),
+        ("YAMCLI_MCP_HTTP_BEARER_TOKEN", "secret-token"),
     ]);
     let client = client();
 
@@ -4346,7 +4362,7 @@ smtp_port = 465
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.auth.status",
+                "name": "yamcli.auth.status",
                 "arguments": {}
             }
         }),
@@ -4361,12 +4377,12 @@ smtp_port = 465
             .expect("auth challenge")
             .to_str()
             .expect("header text"),
-        "Bearer error=\"invalid_token\", scope=\"yacli.auth.read\""
+        "Bearer error=\"invalid_token\", scope=\"yamcli.auth.read\""
     );
     let unauthorized_payload: Value = unauthorized.json().expect("unauthorized json");
     assert_eq!(unauthorized_payload["error"], "invalid_token");
     assert!(unauthorized_payload.get("resource_metadata").is_none());
-    assert_eq!(unauthorized_payload["scope"], "yacli.auth.read");
+    assert_eq!(unauthorized_payload["scope"], "yamcli.auth.read");
 
     let metadata = client
         .get(format!(
@@ -4386,7 +4402,7 @@ smtp_port = 465
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "yacli.auth.status",
+                "name": "yamcli.auth.status",
                 "arguments": {}
             }
         }))
@@ -4440,19 +4456,19 @@ fn mcp_http_initialize_ignores_client_supplied_session_id() {
 
 #[test]
 fn mcp_http_refuses_non_loopback_listen_without_bearer_token() {
-    let output = Command::new(cargo_bin("yacli"))
+    let output = Command::new(cargo_bin("yamcli"))
         .args(["mcp", "--transport", "http", "--listen", "0.0.0.0:0"])
-        .env("YACLI_SECRET_BACKEND", "file")
+        .env("YAMCLI_SECRET_BACKEND", "file")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
-        .expect("run yacli mcp http");
+        .expect("run yamcli mcp http");
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
     let combined = format!("{stdout}{stderr}");
     assert!(
-        combined.contains("non-loopback") && combined.contains("YACLI_MCP_HTTP_BEARER_TOKEN"),
+        combined.contains("non-loopback") && combined.contains("YAMCLI_MCP_HTTP_BEARER_TOKEN"),
         "unexpected output: {combined}"
     );
 }
@@ -4460,8 +4476,8 @@ fn mcp_http_refuses_non_loopback_listen_without_bearer_token() {
 #[test]
 fn mcp_http_exposes_protected_resource_metadata_when_auth_is_enabled() {
     let server = TestHttpServer::spawn_with_envs(&[
-        ("YACLI_MCP_HTTP_BEARER_TOKEN", "secret-token"),
-        ("YACLI_MCP_HTTP_AUTH_ISSUER", "https://auth.example.test"),
+        ("YAMCLI_MCP_HTTP_BEARER_TOKEN", "secret-token"),
+        ("YAMCLI_MCP_HTTP_AUTH_ISSUER", "https://auth.example.test"),
     ]);
     let client = client();
 
@@ -4480,7 +4496,7 @@ fn mcp_http_exposes_protected_resource_metadata_when_auth_is_enabled() {
         payload["authorization_servers"][0],
         "https://auth.example.test"
     );
-    assert_eq!(payload["scopes_supported"][0], "yacli.auth.read");
+    assert_eq!(payload["scopes_supported"][0], "yamcli.auth.read");
     assert_eq!(payload["bearer_methods_supported"][0], "header");
 }
 
@@ -4489,8 +4505,8 @@ fn mcp_http_auth_discovery_uses_public_url_when_provided() {
     let server = TestHttpServer::spawn_with_args_envs(
         &["--public-url", "https://mcp.example.test/mcp"],
         &[
-            ("YACLI_MCP_HTTP_BEARER_TOKEN", "secret-token"),
-            ("YACLI_MCP_HTTP_AUTH_ISSUER", "https://auth.example.test"),
+            ("YAMCLI_MCP_HTTP_BEARER_TOKEN", "secret-token"),
+            ("YAMCLI_MCP_HTTP_AUTH_ISSUER", "https://auth.example.test"),
         ],
     );
     let client = client();
@@ -4600,7 +4616,7 @@ rest_base_url = "https://cloud-api.yandex.net"
     let config_dir = temp.path().display().to_string();
     let home_dir = home.path().display().to_string();
     let server =
-        TestHttpServer::spawn_with_envs(&[("YACLI_CONFIG_DIR", &config_dir), ("HOME", &home_dir)]);
+        TestHttpServer::spawn_with_envs(&[("YAMCLI_CONFIG_DIR", &config_dir), ("HOME", &home_dir)]);
     let client = client();
 
     let initialize = post_json(
@@ -4653,66 +4669,63 @@ rest_base_url = "https://cloud-api.yandex.net"
     assert!(
         resource_templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/account/{account}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/account/{account}")
     );
     assert!(
         resource_templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/skill/{skill}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/skill/{skill}")
     );
     assert!(
         resource_templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/workflow/{workflow}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/workflow/{workflow}")
     );
     assert!(
         resource_templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/activity/{activity}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/activity/{activity}")
     );
     assert!(
         resource_templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/home/{account}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/home/{account}")
     );
     assert!(
         resource_templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/home{?goal}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/home{?goal}")
     );
     assert!(
         resource_templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/home/{account}{?goal}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/home/{account}{?goal}")
     );
     assert!(
         resource_templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/next-actions{?goal}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/next-actions{?goal}")
     );
     assert!(resource_templates.iter().any(
-        |template| template["uriTemplate"] == "resource://yacli/next-actions/{account}{?goal}"
+        |template| template["uriTemplate"] == "resource://yamcli/next-actions/{account}{?goal}"
     ));
     assert!(
         resource_templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/suggestions{?goal}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/suggestions{?goal}")
+    );
+    assert!(resource_templates.iter().any(
+        |template| template["uriTemplate"] == "resource://yamcli/suggestions/{account}{?goal}"
+    ));
+    assert!(
+        resource_templates
+            .iter()
+            .any(|template| template["uriTemplate"] == "resource://yamcli/onboarding{?goal}")
     );
     assert!(
         resource_templates
             .iter()
-            .any(|template| template["uriTemplate"]
-                == "resource://yacli/suggestions/{account}{?goal}")
-    );
-    assert!(
-        resource_templates
-            .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/onboarding{?goal}")
-    );
-    assert!(
-        resource_templates
-            .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/doctor{?goal}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/doctor{?goal}")
     );
 
     let account_resource = post_json(
@@ -4723,7 +4736,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 3,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/account/personal"
+                "uri": "resource://yamcli/account/personal"
             }
         }),
         Some(&session_id),
@@ -4749,7 +4762,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 4,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/skills"
+                "uri": "resource://yamcli/skills"
             }
         }),
         Some(&session_id),
@@ -4776,7 +4789,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 5,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/skill/yacli-mail"
+                "uri": "resource://yamcli/skill/yamcli-mail"
             }
         }),
         Some(&session_id),
@@ -4789,8 +4802,8 @@ rest_base_url = "https://cloud-api.yandex.net"
         .expect("skill contents");
     assert_eq!(skill_contents[0]["mimeType"], "text/markdown");
     let skill_text = skill_contents[0]["text"].as_str().expect("skill text");
-    assert!(skill_text.contains("# yacli mail"));
-    assert!(skill_text.contains("yacli mail send"));
+    assert!(skill_text.contains("# yamcli mail"));
+    assert!(skill_text.contains("yamcli mail send"));
 
     let workflow_catalog = post_json(
         &client,
@@ -4800,7 +4813,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 6,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/workflows"
+                "uri": "resource://yamcli/workflows"
             }
         }),
         Some(&session_id),
@@ -4833,7 +4846,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 7,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/workflow/attachment-to-disk"
+                "uri": "resource://yamcli/workflow/attachment-to-disk"
             }
         }),
         Some(&session_id),
@@ -4874,7 +4887,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 8,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/activity"
+                "uri": "resource://yamcli/activity"
             }
         }),
         Some(&session_id),
@@ -4901,7 +4914,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 9,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/onboarding"
+                "uri": "resource://yamcli/onboarding"
             }
         }),
         Some(&session_id),
@@ -4944,7 +4957,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 10,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/doctor"
+                "uri": "resource://yamcli/doctor"
             }
         }),
         Some(&session_id),
@@ -4982,7 +4995,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 11,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/home"
+                "uri": "resource://yamcli/home"
             }
         }),
         Some(&session_id),
@@ -5010,7 +5023,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 12,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/home/personal"
+                "uri": "resource://yamcli/home/personal"
             }
         }),
         Some(&session_id),
@@ -5040,7 +5053,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 13,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/next-actions"
+                "uri": "resource://yamcli/next-actions"
             }
         }),
         Some(&session_id),
@@ -5075,7 +5088,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 14,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/home/personal?goal=%D0%BE%D1%82%D0%BF%D1%80%D0%B0%D0%B2%D1%8C%20%D1%84%D0%B0%D0%B9%D0%BB%20%D0%BF%D0%BE%20%D0%BF%D0%BE%D1%87%D1%82%D0%B5"
+                "uri": "resource://yamcli/home/personal?goal=%D0%BE%D1%82%D0%BF%D1%80%D0%B0%D0%B2%D1%8C%20%D1%84%D0%B0%D0%B9%D0%BB%20%D0%BF%D0%BE%20%D0%BF%D0%BE%D1%87%D1%82%D0%B5"
             }
         }),
         Some(&session_id),
@@ -5107,7 +5120,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 15,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/next-actions?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
+                "uri": "resource://yamcli/next-actions?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
             }
         }),
         Some(&session_id),
@@ -5141,7 +5154,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 16,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/suggestions"
+                "uri": "resource://yamcli/suggestions"
             }
         }),
         Some(&session_id),
@@ -5171,7 +5184,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 17,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/onboarding?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
+                "uri": "resource://yamcli/onboarding?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
             }
         }),
         Some(&session_id),
@@ -5204,7 +5217,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 18,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/doctor?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
+                "uri": "resource://yamcli/doctor?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
             }
         }),
         Some(&session_id),
@@ -5269,7 +5282,7 @@ rest_base_url = "https://cloud-api.yandex.net"
 "#,
     );
     let config_dir = temp.path().display().to_string();
-    let server = TestHttpServer::spawn_with_envs(&[("YACLI_CONFIG_DIR", &config_dir)]);
+    let server = TestHttpServer::spawn_with_envs(&[("YAMCLI_CONFIG_DIR", &config_dir)]);
     let client = client();
 
     let initialize = post_json(
@@ -5314,7 +5327,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             "id": 2,
             "method": "resources/subscribe",
             "params": {
-                "uri": "resource://yacli/account/personal"
+                "uri": "resource://yamcli/account/personal"
             }
         }),
         Some(&session_id),
@@ -5355,7 +5368,7 @@ rest_base_url = "https://cloud-api.yandex.net"
     assert_eq!(notification["method"], "notifications/resources/updated");
     assert_eq!(
         notification["params"]["uri"],
-        "resource://yacli/account/personal"
+        "resource://yamcli/account/personal"
     );
 }
 
@@ -5403,7 +5416,7 @@ fn mcp_http_goal_route_tool_matches_invite_workflow_for_russian_goal() {
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.goal.route",
+                "name": "yamcli.goal.route",
                 "arguments": {
                     "goal": "найди приглашение в письме и добавь встречу в календарь team"
                 }
@@ -5450,7 +5463,7 @@ fn mcp_http_doctor_apply_safe_tool_installs_detected_claude_desktop() {
 
     let server = TestHttpServer::spawn_with_envs(&[
         (
-            "YACLI_CONFIG_DIR",
+            "YAMCLI_CONFIG_DIR",
             config_dir.path().to_str().expect("config dir"),
         ),
         ("HOME", home_dir.path().to_str().expect("home dir")),
@@ -5496,7 +5509,7 @@ fn mcp_http_doctor_apply_safe_tool_installs_detected_claude_desktop() {
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "yacli.doctor.apply_safe",
+                "name": "yamcli.doctor.apply_safe",
                 "arguments": {}
             }
         }),
@@ -5521,7 +5534,7 @@ fn mcp_http_doctor_apply_safe_tool_installs_detected_claude_desktop() {
             "id": 3,
             "method": "resources/read",
             "params": {
-                "uri": "resource://yacli/activity"
+                "uri": "resource://yamcli/activity"
             }
         }),
         Some(&session_id),
@@ -5542,7 +5555,7 @@ fn mcp_http_doctor_apply_safe_tool_installs_detected_claude_desktop() {
     assert_eq!(activity_json["items"][0]["source"], "mcp");
     assert_eq!(
         activity_json["items"][0]["replay_command"],
-        "yacli doctor --apply-safe"
+        "yamcli doctor --apply-safe"
     );
     assert!(expected_config.exists());
 }

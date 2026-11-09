@@ -5,7 +5,7 @@ use tempfile::tempdir;
 #[test]
 fn homebrew_formula_includes_linux_arm64_release_asset() {
     let temp = tempdir().expect("tempdir");
-    let output = temp.path().join("yacli.rb");
+    let output = temp.path().join("yamcli.rb");
 
     let status = Command::new("sh")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
@@ -30,7 +30,7 @@ fn homebrew_formula_includes_linux_arm64_release_asset() {
     assert!(status.success());
 
     let formula = fs::read_to_string(&output).expect("formula");
-    assert!(formula.contains("yacli-aarch64-unknown-linux-gnu.tar.gz"));
+    assert!(formula.contains("yamcli-aarch64-unknown-linux-gnu.tar.gz"));
     assert!(formula.contains("sha256 \"arm64sha\""));
     assert!(formula.contains("elsif Hardware::CPU.intel?"));
     assert!(formula.contains("sha256 \"x64sha\""));

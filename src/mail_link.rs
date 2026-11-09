@@ -7,7 +7,7 @@ use crate::disk::{
     DiskResource, DiskUploadReview, PrivateDiskPublishRequest, PrivateDiskUploadRequest,
     UploadedFile, publish_private_resource, review_private_upload, upload_private_resource,
 };
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 use crate::mail::{
     MailDelivery, MailSendRequest, MailSendReview, MailSessionAuth, SentMail,
     review_mail_submission, send_mail_message_via,
@@ -234,7 +234,7 @@ pub fn send_link_via_mail(
         },
     )?;
     let public_url = resource.public_url.as_deref().ok_or_else(|| {
-        YacliError::Api(format!(
+        YamcliError::Api(format!(
             "Yandex Disk did not return `public_url` after publishing `{}`",
             resource.path
         ))
@@ -304,7 +304,7 @@ fn partial_failure(
     upload: &UploadedFile,
     resource: &DiskResource,
     request: &MailSendPublishedLinkRequest,
-    err: YacliError,
+    err: YamcliError,
 ) -> MailSendLinkPartialFailure {
     let public_url = resource.public_url.as_deref().unwrap_or("-").to_string();
     MailSendLinkPartialFailure {
@@ -322,7 +322,7 @@ fn partial_failure(
                 public_key: resource.public_key.clone(),
             },
             retry_mail_step: RetryMailStepRecovery {
-                tool: "yacli.mail.send_published_link".to_string(),
+                tool: "yamcli.mail.send_published_link".to_string(),
                 command: send_published_link_command(request, true),
                 arguments: json!({
                     "to": request.to.first().cloned().unwrap_or_default(),
@@ -336,9 +336,9 @@ fn partial_failure(
                 }),
             },
             cleanup_public_link: CleanupPublicLinkRecovery {
-                tool: "yacli.disk.unpublish".to_string(),
+                tool: "yamcli.disk.unpublish".to_string(),
                 command: format!(
-                    "yacli disk unpublish {} --dry-run",
+                    "yamcli disk unpublish {} --dry-run",
                     shell_quote(&resource.path)
                 ),
                 arguments: json!({
@@ -355,7 +355,7 @@ pub fn send_published_link_command(
     dry_run: bool,
 ) -> String {
     let mut command = format!(
-        "yacli mail send-published-link {} {}",
+        "yamcli mail send-published-link {} {}",
         shell_quote(request.to.first().map(String::as_str).unwrap_or("")),
         shell_quote(&request.subject)
     );
@@ -474,7 +474,7 @@ mod tests {
                 html: None,
                 public_url: "https://disk.yandex.ru/i/report".to_string(),
             },
-            YacliError::Network("smtp failed".to_string()),
+            YamcliError::Network("smtp failed".to_string()),
         );
         assert_eq!(partial.error.code, "NETWORK_ERROR");
         assert_eq!(
@@ -483,7 +483,7 @@ mod tests {
         );
         assert_eq!(
             partial.recovery.cleanup_public_link.tool,
-            "yacli.disk.unpublish"
+            "yamcli.disk.unpublish"
         );
     }
 }

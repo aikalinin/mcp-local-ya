@@ -5,7 +5,7 @@ use crate::calendar::{CalendarCollection, CalendarEvent, delete_calendar_event};
 use crate::disk::{
     DiskResource, PrivateDiskUnpublishRequest, UnpublishedDiskResource, unpublish_private_resource,
 };
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 use crate::runtime_context::{resolve_calendar_private_context, resolve_disk_private_context};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -20,17 +20,17 @@ impl ActivityUndoAction {
         match self {
             Self::CalendarDelete { calendar, uid } => {
                 if calendar == "default" {
-                    format!("yacli calendar delete {}", shell_quote(uid))
+                    format!("yamcli calendar delete {}", shell_quote(uid))
                 } else {
                     format!(
-                        "yacli calendar delete --calendar {} {}",
+                        "yamcli calendar delete --calendar {} {}",
                         shell_quote(calendar),
                         shell_quote(uid)
                     )
                 }
             }
             Self::DiskUnpublish { path } => {
-                format!("yacli disk unpublish {}", shell_quote(path))
+                format!("yamcli disk unpublish {}", shell_quote(path))
             }
         }
     }
@@ -76,7 +76,7 @@ pub fn disk_publish_undo(resource: &DiskResource) -> ActivityUndoAction {
 
 pub fn apply_activity_undo(entry: &ActivityEntry) -> Result<ActivityUndoApplied> {
     let undo = entry.undo.clone().ok_or_else(|| {
-        YacliError::UnsupportedOperation(format!(
+        YamcliError::UnsupportedOperation(format!(
             "activity undo: запись `{}` не поддерживает откат",
             entry.id
         ))

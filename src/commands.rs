@@ -40,7 +40,7 @@ use crate::disk_link::{
     upload_link_to_disk,
 };
 use crate::doctor::doctor_payload;
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 use crate::goal_router::goal_route_payload;
 use crate::home::home_payload;
 use crate::mail::{
@@ -66,7 +66,7 @@ use crate::mcp::install::execute_install;
 use crate::model::{AccountConfig, CalendarAuthMode, DiskAuthMode, MailAuthMode, NewAccountInput};
 use crate::next_actions::next_actions_payload;
 use crate::oauth::{
-    OauthService, default_yacli_client_id, exchange_authorization_code, start_pkce_authorization,
+    OauthService, default_yamcli_client_id, exchange_authorization_code, start_pkce_authorization,
 };
 use crate::oauth_session_store::{PendingOauthSession, PendingOauthSessionStore};
 use crate::output::RenderedOutput;
@@ -158,7 +158,7 @@ pub fn execute(cli: Cli) -> Result<RenderedOutput> {
                 }),
             ..
         } => execute_install(cli.format, client, transport, url),
-        Command::Mcp { action: None, .. } => Err(YacliError::UnsupportedOperation(
+        Command::Mcp { action: None, .. } => Err(YamcliError::UnsupportedOperation(
             "mcp server mode is handled in main".to_string(),
         )),
         Command::Update {
@@ -236,7 +236,7 @@ fn execute_setup(format: OutputFormat, request: SetupRequest) -> Result<Rendered
     } = request;
 
     if calendar_app_password.is_some() && calendar_env_var.is_some() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "setup accepts either `--calendar-app-password` or `--calendar-env-var`, but not both"
                 .to_string(),
         ));
@@ -318,7 +318,7 @@ fn execute_setup(format: OutputFormat, request: SetupRequest) -> Result<Rendered
         });
 
         if !skip_login {
-            next_actions.push("run `yacli setup` without `--plan-only` to complete OAuth login");
+            next_actions.push("run `yamcli setup` without `--plan-only` to complete OAuth login");
         }
         if calendar_app_password.is_none() && calendar_env_var.is_none() {
             next_actions.push(
@@ -333,7 +333,7 @@ fn execute_setup(format: OutputFormat, request: SetupRequest) -> Result<Rendered
                 detail: "mail/disk OAuth login was skipped by request".to_string(),
                 output: None,
             });
-            next_actions.push("run `yacli login` to connect Почту и Диск");
+            next_actions.push("run `yamcli login` to connect Почту и Диск");
         } else {
             let login = execute_auth(
                 OutputFormat::Json,
@@ -365,7 +365,7 @@ fn execute_setup(format: OutputFormat, request: SetupRequest) -> Result<Rendered
             });
             if login_pending {
                 next_actions.push(
-                    "complete mail/disk OAuth with `yacli login --account <аккаунт> --code <код>`",
+                    "complete mail/disk OAuth with `yamcli login --account <аккаунт> --code <код>`",
                 );
             }
         }
@@ -417,7 +417,7 @@ fn execute_setup(format: OutputFormat, request: SetupRequest) -> Result<Rendered
                 output: None,
             });
             next_actions.push(
-                "run `yacli login calendar --app-password <пароль>` or `yacli setup --calendar-app-password <пароль>`",
+                "run `yamcli login calendar --app-password <пароль>` or `yamcli setup --calendar-app-password <пароль>`",
             );
         }
 
@@ -428,7 +428,7 @@ fn execute_setup(format: OutputFormat, request: SetupRequest) -> Result<Rendered
                 detail: "mcp install was skipped by request".to_string(),
                 output: None,
             });
-            next_actions.push("run `yacli mcp install` when you are ready to register the server");
+            next_actions.push("run `yamcli mcp install` when you are ready to register the server");
         } else {
             let install = execute_install(OutputFormat::Json, clients, mcp_transport, mcp_url)?;
             if install.exit_code != 0 {
@@ -473,7 +473,7 @@ fn execute_setup(format: OutputFormat, request: SetupRequest) -> Result<Rendered
     let table = render_setup_table(&payload);
 
     let Some(mut object) = payload.as_object().cloned() else {
-        return Err(YacliError::Serialization(
+        return Err(YamcliError::Serialization(
             "expected setup payload object".to_string(),
         ));
     };
@@ -501,7 +501,7 @@ fn ensure_setup_account(
 
             if let Some(existing) = store.file.accounts.get(&requested_name) {
                 if existing.email != email {
-                    return Err(YacliError::Validation(format!(
+                    return Err(YamcliError::Validation(format!(
                         "account `{requested_name}` already exists for `{}`; choose another `--name`",
                         existing.email
                     )));
@@ -525,7 +525,7 @@ fn ensure_setup_account(
                 .find(|(_, account)| account.email.eq_ignore_ascii_case(&email))
             {
                 if explicit_name && existing_name != &requested_name {
-                    return Err(YacliError::Validation(format!(
+                    return Err(YamcliError::Validation(format!(
                         "email `{email}` already exists as account `{existing_name}`; rerun without `--name` or use `--name {existing_name}`"
                     )));
                 }
@@ -555,7 +555,7 @@ fn ensure_setup_account(
                 });
                 let report = validate_account(&requested_name, &account_config);
                 if !report.valid {
-                    return Err(YacliError::Validation(report.errors.join("; ")));
+                    return Err(YamcliError::Validation(report.errors.join("; ")));
                 }
                 store.add_account(requested_name.clone(), account_config)?;
                 store.set_current(&requested_name)?;
@@ -672,7 +672,7 @@ fn execute_workflow(format: OutputFormat, action: WorkflowCommand) -> Result<Ren
         }
         WorkflowCommand::Show { id } => {
             let workflow = workflows::workflow_runtime_detail(&id, None)?.ok_or_else(|| {
-                YacliError::UnsupportedOperation(format!("unknown workflow: {id}"))
+                YamcliError::UnsupportedOperation(format!("unknown workflow: {id}"))
             })?;
             let cli_steps = workflow["cli_steps"]
                 .as_array()
@@ -776,7 +776,7 @@ fn execute_activity(format: OutputFormat, action: ActivityCommand) -> Result<Ren
         ActivityCommand::Show { id } => {
             let store = ActivityStore::load()?;
             let entry = store.find(&id).cloned().ok_or_else(|| {
-                YacliError::Validation(format!("activity show: запись `{id}` не найдена"))
+                YamcliError::Validation(format!("activity show: запись `{id}` не найдена"))
             })?;
             ok_output(
                 format,
@@ -790,7 +790,7 @@ fn execute_activity(format: OutputFormat, action: ActivityCommand) -> Result<Ren
         ActivityCommand::Undo { id } => {
             let store = ActivityStore::load()?;
             let entry = store.find(&id).cloned().ok_or_else(|| {
-                YacliError::Validation(format!("activity undo: запись `{id}` не найдена"))
+                YamcliError::Validation(format!("activity undo: запись `{id}` не найдена"))
             })?;
             let applied = apply_activity_undo(&entry)?;
             record_activity_best_effort(NewActivityEntry {
@@ -891,7 +891,7 @@ fn execute_goal(
     ok_output(format, "goal", payload, table)
 }
 
-const SAFE_CALENDAR_ENV_VAR: &str = "YACLI_CALENDAR_APP_PASSWORD";
+const SAFE_CALENDAR_ENV_VAR: &str = "YAMCLI_CALENDAR_APP_PASSWORD";
 
 pub fn apply_safe_doctor_remediation(
     account: Option<&str>,
@@ -906,13 +906,13 @@ pub fn apply_safe_doctor_remediation(
     if doctor_before["current_account"].is_null() {
         let command = doctor_check(&doctor_before, "account")
             .and_then(|check| check["recommended_command"].as_str())
-            .unwrap_or("yacli setup me@yandex.ru")
+            .unwrap_or("yamcli setup me@yandex.ru")
             .to_string();
         steps.push(remediation_step(
             "account",
             "Аккаунт",
             "needs_input",
-            "Для безопасного auto-fix нужен уже выбранный аккаунт или `yacli setup` с email."
+            "Для безопасного auto-fix нужен уже выбранный аккаунт или `yamcli setup` с email."
                 .to_string(),
             Some(command),
             None,
@@ -946,7 +946,7 @@ pub fn apply_safe_doctor_remediation(
                                 "Календарь привязан к стандартной env-переменной `{SAFE_CALENDAR_ENV_VAR}`."
                             ),
                             Some(format!(
-                                "yacli login calendar --env-var {SAFE_CALENDAR_ENV_VAR}"
+                                "yamcli login calendar --env-var {SAFE_CALENDAR_ENV_VAR}"
                             )),
                             Some(output.json),
                         ));
@@ -975,7 +975,7 @@ pub fn apply_safe_doctor_remediation(
                         "Для safe fix не хватает env-переменной `{SAFE_CALENDAR_ENV_VAR}` с app password."
                     ),
                     Some(format!(
-                        "export {SAFE_CALENDAR_ENV_VAR}=<пароль> && yacli doctor --apply-safe"
+                        "export {SAFE_CALENDAR_ENV_VAR}=<пароль> && yamcli doctor --apply-safe"
                     )),
                     None,
                 ));
@@ -1025,7 +1025,7 @@ pub fn apply_safe_doctor_remediation(
             needs_input_count += 1;
         } else {
             let command = format!(
-                "yacli mcp install{}",
+                "yamcli mcp install{}",
                 clients
                     .iter()
                     .map(|client| format!(" --client {}", mcp_client_label(*client)))
@@ -1130,7 +1130,7 @@ pub fn doctor_safe_remediation_activity_entry(
         })
         .unwrap_or_else(|| "-".to_string());
 
-    let mut replay_command = "yacli doctor --apply-safe".to_string();
+    let mut replay_command = "yamcli doctor --apply-safe".to_string();
     if let Some(account) = requested_account {
         replay_command.push_str(" --account ");
         replay_command.push_str(&shell_quote(account));
@@ -1301,7 +1301,7 @@ fn execute_account(format: OutputFormat, action: AccountCommand) -> Result<Rende
             });
             let report = validate_account(&name, &account_config);
             if !report.valid {
-                return Err(YacliError::Validation(report.errors.join("; ")));
+                return Err(YamcliError::Validation(report.errors.join("; ")));
             }
 
             let mut store = AccountStore::load()?;
@@ -1520,12 +1520,12 @@ fn execute_auth(format: OutputFormat, action: AuthCommand) -> Result<RenderedOut
                     let account = account_store.get_account(&account_name)?;
                     ensure_calendar_supports_app_password(account)?;
                     if client_id.is_some() || code.is_some() || login_hint.is_some() {
-                        return Err(YacliError::Validation(
-                            "calendar login uses app password auth; rerun with `yacli login calendar --app-password <app-password>` or `yacli login calendar --env-var NAME`".to_string(),
+                        return Err(YamcliError::Validation(
+                            "calendar login uses app password auth; rerun with `yamcli login calendar --app-password <app-password>` or `yamcli login calendar --env-var NAME`".to_string(),
                         ));
                     }
                     if env_var.is_some() && app_password.is_some() {
-                        return Err(YacliError::Validation(
+                        return Err(YamcliError::Validation(
                             "calendar login accepts either `--app-password` or `--env-var`, but not both".to_string(),
                         ));
                     }
@@ -1546,7 +1546,7 @@ fn execute_auth(format: OutputFormat, action: AuthCommand) -> Result<RenderedOut
                         }
                         (None, Some(env_var)) => (format!("env:{env_var}"), "app_password_env"),
                         (None, None) => {
-                            return Err(YacliError::Validation(
+                            return Err(YamcliError::Validation(
                                 "calendar login requires `--app-password <app-password>` or `--env-var NAME`".to_string(),
                             ));
                         }
@@ -1584,17 +1584,17 @@ fn execute_auth(format: OutputFormat, action: AuthCommand) -> Result<RenderedOut
                     if env_var.is_some() || app_password.is_some() {
                         let command_hint = match requested_service {
                             Some(AuthServiceArg::Mail) => {
-                                "mail login uses built-in OAuth by default; run `yacli login mail`"
+                                "mail login uses built-in OAuth by default; run `yamcli login mail`"
                             }
                             Some(AuthServiceArg::Disk) => {
-                                "disk login uses built-in OAuth by default; run `yacli login disk`"
+                                "disk login uses built-in OAuth by default; run `yamcli login disk`"
                             }
                             None => {
-                                "plain `yacli login` connects Почту и Диск; calendar still requires `yacli login calendar --app-password <app-password>` or `--env-var`"
+                                "plain `yamcli login` connects Почту и Диск; calendar still requires `yamcli login calendar --app-password <app-password>` or `--env-var`"
                             }
                             Some(AuthServiceArg::Calendar) => unreachable!(),
                         };
-                        return Err(YacliError::Validation(command_hint.to_string()));
+                        return Err(YamcliError::Validation(command_hint.to_string()));
                     }
                     let client_id_source = if client_id.is_some() {
                         "override"
@@ -1602,7 +1602,7 @@ fn execute_auth(format: OutputFormat, action: AuthCommand) -> Result<RenderedOut
                         "built_in"
                     };
                     let client_id =
-                        client_id.unwrap_or_else(|| default_yacli_client_id().to_string());
+                        client_id.unwrap_or_else(|| default_yamcli_client_id().to_string());
                     let resolved_login_hint = login_hint.or(Some(account.email.clone()));
                     let mut session_store = PendingOauthSessionStore::load()?;
                     let existing_pending = session_store
@@ -1759,8 +1759,8 @@ fn execute_auth(format: OutputFormat, action: AuthCommand) -> Result<RenderedOut
         }
         AuthCommand::Logout { account, service } => {
             let service = service.ok_or_else(|| {
-                YacliError::Validation(
-                    "logout without service is handled by the top-level `yacli logout`; internal `auth logout` still requires an explicit service".to_string(),
+                YamcliError::Validation(
+                    "logout without service is handled by the top-level `yamcli logout`; internal `auth logout` still requires an explicit service".to_string(),
                 )
             })?;
             let mut account_store = AccountStore::load()?;
@@ -1877,7 +1877,7 @@ fn execute_disk(format: OutputFormat, action: DiskCommand) -> Result<RenderedOut
                     operation: "disk.mkdir".to_string(),
                     account: resolved_account.clone(),
                     summary: format!("Создана папка на Диске: {}", resource.path),
-                    replay_command: format!("yacli disk mkdir {}", shell_quote(&resource.path)),
+                    replay_command: format!("yamcli disk mkdir {}", shell_quote(&resource.path)),
                     undo: None,
                 });
             })
@@ -1931,7 +1931,7 @@ fn execute_disk(format: OutputFormat, action: DiskCommand) -> Result<RenderedOut
                 )
                 .inspect(|_| {
                     let mut replay = format!(
-                        "yacli disk upload {} {}",
+                        "yamcli disk upload {} {}",
                         shell_quote(&uploaded.source_path),
                         shell_quote(&uploaded.remote_path)
                     );
@@ -2009,7 +2009,7 @@ fn execute_disk(format: OutputFormat, action: DiskCommand) -> Result<RenderedOut
                                 .unwrap_or(&result.resource.path)
                         ),
                         replay_command: format!(
-                            "yacli disk upload-link --source {} --path {} --dry-run",
+                            "yamcli disk upload-link --source {} --path {} --dry-run",
                             shell_quote(&result.upload.source_path),
                             shell_quote(&result.resource.path)
                         ),
@@ -2053,7 +2053,7 @@ fn execute_disk(format: OutputFormat, action: DiskCommand) -> Result<RenderedOut
             )
             .inspect(|_| {
                 let mut replay = format!(
-                    "yacli disk download {} --output {}",
+                    "yamcli disk download {} --output {}",
                     shell_quote(&resource.path),
                     shell_quote(&artifact.output_path)
                 );
@@ -2120,7 +2120,7 @@ fn execute_disk(format: OutputFormat, action: DiskCommand) -> Result<RenderedOut
                             resource.public_url.as_deref().unwrap_or(&resource.path)
                         ),
                         replay_command: format!(
-                            "yacli disk publish {} --dry-run",
+                            "yamcli disk publish {} --dry-run",
                             shell_quote(&resource.path)
                         ),
                         undo: Some(disk_publish_undo(&resource)),
@@ -2175,7 +2175,7 @@ fn execute_disk(format: OutputFormat, action: DiskCommand) -> Result<RenderedOut
                                 .unwrap_or(&result.resource.path)
                         ),
                         replay_command: format!(
-                            "yacli disk unpublish {} --dry-run",
+                            "yamcli disk unpublish {} --dry-run",
                             shell_quote(&result.resource.path)
                         ),
                         undo: None,
@@ -2269,14 +2269,14 @@ fn execute_calendar(format: OutputFormat, action: CalendarCommand) -> Result<Ren
                 calendar,
                 from: chrono::DateTime::parse_from_rfc3339(&window.from)
                     .map_err(|err| {
-                        YacliError::Serialization(format!(
+                        YamcliError::Serialization(format!(
                             "failed to rebuild calendar --from boundary: {err}"
                         ))
                     })?
                     .with_timezone(&chrono::Utc),
                 to: chrono::DateTime::parse_from_rfc3339(&window.to)
                     .map_err(|err| {
-                        YacliError::Serialization(format!(
+                        YamcliError::Serialization(format!(
                             "failed to rebuild calendar --to boundary: {err}"
                         ))
                     })?
@@ -2585,7 +2585,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
                 )
                 .inspect(|_| {
                     let mut replay = format!(
-                        "yacli mail send {} {} {}",
+                        "yamcli mail send {} {} {}",
                         shell_quote(sent.to.first().map(String::as_str).unwrap_or("")),
                         shell_quote(&sent.subject),
                         shell_quote("<текст письма>")
@@ -2676,7 +2676,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
                     )
                     .inspect(|_| {
                         let mut replay = format!(
-                            "yacli mail send-link {} {} {} --source {} --path {} --dry-run",
+                            "yamcli mail send-link {} {} {} --source {} --path {} --dry-run",
                             shell_quote(
                                 result
                                     .sent
@@ -3120,10 +3120,10 @@ fn mail_attachment_selector_for_command(
     match (index, name) {
         (Some(index), None) => Ok(MailAttachmentSelector::Index(index)),
         (None, Some(name)) => Ok(MailAttachmentSelector::Filename(name)),
-        (Some(_), Some(_)) => Err(YacliError::Validation(format!(
+        (Some(_), Some(_)) => Err(YamcliError::Validation(format!(
             "{command_name} accepts either --index or --name, not both"
         ))),
-        (None, None) => Err(YacliError::Validation(format!(
+        (None, None) => Err(YamcliError::Validation(format!(
             "{command_name} requires --index or --name"
         ))),
     }
@@ -3131,7 +3131,7 @@ fn mail_attachment_selector_for_command(
 
 fn validate_positive_event_index(command_name: &str, event_index: usize) -> Result<()> {
     if event_index == 0 {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{command_name} --event-index must be greater than zero"
         )));
     }
@@ -3214,7 +3214,7 @@ fn execute_disk_public(format: OutputFormat, action: DiskPublicCommand) -> Resul
                 ),
             )
             .inspect(|_| {
-                let mut replay = "yacli disk public download".to_string();
+                let mut replay = "yamcli disk public download".to_string();
                 if let Some(account) = resolved_account_for_activity.as_deref() {
                     replay.push_str(" --account ");
                     replay.push_str(&shell_quote(account));
@@ -3259,7 +3259,7 @@ fn ok_output(
     table: String,
 ) -> Result<RenderedOutput> {
     let Some(mut object) = payload.as_object().cloned() else {
-        return Err(YacliError::Serialization(
+        return Err(YamcliError::Serialization(
             "expected object payload".to_string(),
         ));
     };
@@ -3282,7 +3282,7 @@ fn non_ok_output(
     exit_code: i32,
 ) -> Result<RenderedOutput> {
     let Some(mut object) = payload.as_object().cloned() else {
-        return Err(YacliError::Serialization(
+        return Err(YamcliError::Serialization(
             "expected object payload".to_string(),
         ));
     };
@@ -3431,21 +3431,24 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             topic: "all",
             summary: "Показать единый home screen: onboarding, подключённые сервисы, workflows и activity.",
             requires_account: false,
-            examples: vec!["yacli home", "yacli home --account work"],
+            examples: vec!["yamcli home", "yamcli home --account work"],
         },
         GuideCommandEntry {
             path: "doctor",
             topic: "all",
             summary: "Проверить health-check продукта: конфиг, secret backend, сервисы и readiness workflows.",
             requires_account: false,
-            examples: vec!["yacli doctor", "yacli doctor --account work"],
+            examples: vec!["yamcli doctor", "yamcli doctor --account work"],
         },
         GuideCommandEntry {
             path: "next",
             topic: "all",
             summary: "Показать ranked next actions с наибольшим продуктовым эффектом.",
             requires_account: false,
-            examples: vec!["yacli next", "yacli next --goal \"отправь файл по почте\""],
+            examples: vec![
+                "yamcli next",
+                "yamcli next --goal \"отправь файл по почте\"",
+            ],
         },
         GuideCommandEntry {
             path: "suggest",
@@ -3453,8 +3456,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Показать proactive suggestions из реальной activity history и обратимых действий.",
             requires_account: false,
             examples: vec![
-                "yacli suggest",
-                "yacli suggest --goal \"отправь ссылку по почте\"",
+                "yamcli suggest",
+                "yamcli suggest --goal \"отправь ссылку по почте\"",
             ],
         },
         GuideCommandEntry {
@@ -3463,8 +3466,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Маршрутизировать естественную цель в лучший workflow, prompt и MCP tool-path.",
             requires_account: false,
             examples: vec![
-                "yacli goal \"найди приглашение и добавь событие в календарь\"",
-                "yacli goal \"отправь файл по почте\" --account work",
+                "yamcli goal \"найди приглашение и добавь событие в календарь\"",
+                "yamcli goal \"отправь файл по почте\" --account work",
             ],
         },
         GuideCommandEntry {
@@ -3472,126 +3475,130 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             topic: "account",
             summary: "Добавить аккаунт Яндекса и сразу сделать его текущим.",
             requires_account: false,
-            examples: vec!["yacli add me@yandex.ru"],
+            examples: vec!["yamcli add me@yandex.ru"],
         },
         GuideCommandEntry {
             path: "accounts",
             topic: "account",
             summary: "Показать все настроенные аккаунты.",
             requires_account: false,
-            examples: vec!["yacli accounts"],
+            examples: vec!["yamcli accounts"],
         },
         GuideCommandEntry {
             path: "use",
             topic: "account",
             summary: "Сделать аккаунт текущим для последующих команд.",
             requires_account: false,
-            examples: vec!["yacli use work"],
+            examples: vec!["yamcli use work"],
         },
         GuideCommandEntry {
             path: "whoami",
             topic: "account",
             summary: "Показать текущий активный аккаунт.",
             requires_account: false,
-            examples: vec!["yacli whoami"],
+            examples: vec!["yamcli whoami"],
         },
         GuideCommandEntry {
             path: "update",
             topic: "account",
-            summary: "Проверить наличие нового release или обновить установленный yacli по месту.",
+            summary: "Проверить наличие нового release или обновить установленный yamcli по месту.",
             requires_account: false,
-            examples: vec!["yacli update --check", "yacli update"],
+            examples: vec!["yamcli update --check", "yamcli update"],
         },
         GuideCommandEntry {
             path: "status",
             topic: "auth",
             summary: "Показать, что подключено у текущего аккаунта.",
             requires_account: true,
-            examples: vec!["yacli status"],
+            examples: vec!["yamcli status"],
         },
         GuideCommandEntry {
             path: "activity list",
             topic: "all",
             summary: "Показать последние успешные write-действия и их replay-команды.",
             requires_account: false,
-            examples: vec!["yacli activity list --limit 20"],
+            examples: vec!["yamcli activity list --limit 20"],
         },
         GuideCommandEntry {
             path: "activity show",
             topic: "all",
             summary: "Показать одну запись журнала и безопасную replay-команду.",
             requires_account: false,
-            examples: vec!["yacli activity show <id>"],
+            examples: vec!["yamcli activity show <id>"],
         },
         GuideCommandEntry {
             path: "activity undo",
             topic: "all",
             summary: "Откатить одно обратимое действие по ID из Activity Log.",
             requires_account: false,
-            examples: vec!["yacli activity undo <id>"],
+            examples: vec!["yamcli activity undo <id>"],
         },
         GuideCommandEntry {
             path: "login",
             topic: "auth",
-            summary: "Подключить Почту и Диск одной OAuth-командой через встроенное приложение yacli.",
+            summary: "Подключить Почту и Диск одной OAuth-командой через встроенное приложение yamcli.",
             requires_account: true,
-            examples: vec!["yacli login", "yacli login mail", "yacli login disk"],
+            examples: vec!["yamcli login", "yamcli login mail", "yamcli login disk"],
         },
         GuideCommandEntry {
             path: "logout",
             topic: "auth",
             summary: "Отключить все сервисы у текущего аккаунта или только один выбранный сервис.",
             requires_account: true,
-            examples: vec!["yacli logout", "yacli logout mail", "yacli logout calendar"],
+            examples: vec![
+                "yamcli logout",
+                "yamcli logout mail",
+                "yamcli logout calendar",
+            ],
         },
         GuideCommandEntry {
             path: "login calendar",
             topic: "auth",
             summary: "Подключить Календарь через пароль приложения Яндекс ID или env-переменную.",
             requires_account: true,
-            examples: vec!["yacli login calendar --app-password <app-password>"],
+            examples: vec!["yamcli login calendar --app-password <app-password>"],
         },
         GuideCommandEntry {
             path: "mail folders",
             topic: "mail",
             summary: "Показать доступные папки в почтовом ящике.",
             requires_account: true,
-            examples: vec!["yacli mail folders"],
+            examples: vec!["yamcli mail folders"],
         },
         GuideCommandEntry {
             path: "mail list",
             topic: "mail",
             summary: "Показать список писем в папке. По умолчанию это INBOX.",
             requires_account: true,
-            examples: vec!["yacli mail list --limit 10"],
+            examples: vec!["yamcli mail list --limit 10"],
         },
         GuideCommandEntry {
             path: "mail search",
             topic: "mail",
             summary: "Найти письма по тексту. По умолчанию поиск идет в INBOX.",
             requires_account: true,
-            examples: vec!["yacli mail search \"смета\""],
+            examples: vec!["yamcli mail search \"смета\""],
         },
         GuideCommandEntry {
             path: "mail reply",
             topic: "mail",
             summary: "Ответить на письмо по ID из `mail list` или `mail search`.",
             requires_account: true,
-            examples: vec!["yacli mail reply 1353 \"Принято\""],
+            examples: vec!["yamcli mail reply 1353 \"Принято\""],
         },
         GuideCommandEntry {
             path: "mail forward",
             topic: "mail",
             summary: "Переслать письмо по ID из `mail list` или `mail search`.",
             requires_account: true,
-            examples: vec!["yacli mail forward 1353 person@example.com \"FYI\""],
+            examples: vec!["yamcli mail forward 1353 person@example.com \"FYI\""],
         },
         GuideCommandEntry {
             path: "mail read",
             topic: "mail",
             summary: "Открыть письмо по ID из `mail list` или `mail search`.",
             requires_account: true,
-            examples: vec!["yacli mail read 1353"],
+            examples: vec!["yamcli mail read 1353"],
         },
         GuideCommandEntry {
             path: "mail attachment export",
@@ -3599,8 +3606,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Сохранить выбранное вложение письма в локальный файл.",
             requires_account: true,
             examples: vec![
-                "yacli mail attachment export 1353 --index 1 --output ./invoice.pdf",
-                "yacli mail attachment export 1353 --name invoice.pdf --output ./invoice.pdf",
+                "yamcli mail attachment export 1353 --index 1 --output ./invoice.pdf",
+                "yamcli mail attachment export 1353 --name invoice.pdf --output ./invoice.pdf",
             ],
         },
         GuideCommandEntry {
@@ -3609,8 +3616,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Разобрать calendar invite из вложения письма и показать VEVENT поля.",
             requires_account: true,
             examples: vec![
-                "yacli mail invite inspect 1353 --index 1",
-                "yacli mail invite inspect 1353 --name invite.ics",
+                "yamcli mail invite inspect 1353 --index 1",
+                "yamcli mail invite inspect 1353 --name invite.ics",
             ],
         },
         GuideCommandEntry {
@@ -3619,8 +3626,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Создать событие в календаре из `.ics` или `text/calendar` вложения письма.",
             requires_account: true,
             examples: vec![
-                "yacli mail invite create-event 1353 --index 1",
-                "yacli mail invite create-event 1353 --name invite.ics --calendar team --event-index 2",
+                "yamcli mail invite create-event 1353 --index 1",
+                "yamcli mail invite create-event 1353 --name invite.ics --calendar team --event-index 2",
             ],
         },
         GuideCommandEntry {
@@ -3629,9 +3636,9 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Отправить письмо через SMTP с OAuth XOAUTH2 или app password, при необходимости с локальными вложениями.",
             requires_account: true,
             examples: vec![
-                "yacli mail send person@example.com \"Синк\" \"Привет\"",
-                "yacli mail send person@example.com \"Счёт\" \"Во вложении\" --attach ./invoice.pdf",
-                "yacli mail send person@example.com \"Счёт\" \"Во вложении\" --attach ./invoice.pdf --dry-run",
+                "yamcli mail send person@example.com \"Синк\" \"Привет\"",
+                "yamcli mail send person@example.com \"Счёт\" \"Во вложении\" --attach ./invoice.pdf",
+                "yamcli mail send person@example.com \"Счёт\" \"Во вложении\" --attach ./invoice.pdf --dry-run",
             ],
         },
         GuideCommandEntry {
@@ -3640,8 +3647,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Загрузить большой локальный файл на Диск, опубликовать ссылку и отправить её по почте.",
             requires_account: true,
             examples: vec![
-                "yacli mail send-link person@example.com \"Материалы\" \"Отправляю ссылку\" --source ./archive.zip --path disk:/docs/archive/archive.zip",
-                "yacli mail send-link person@example.com \"Материалы\" \"Отправляю ссылку\" --source ./archive.zip --path disk:/docs/archive/archive.zip --dry-run",
+                "yamcli mail send-link person@example.com \"Материалы\" \"Отправляю ссылку\" --source ./archive.zip --path disk:/docs/archive/archive.zip",
+                "yamcli mail send-link person@example.com \"Материалы\" \"Отправляю ссылку\" --source ./archive.zip --path disk:/docs/archive/archive.zip --dry-run",
             ],
         },
         GuideCommandEntry {
@@ -3650,8 +3657,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Повторно отправить письмо с уже опубликованной ссылкой без повторного upload/publish.",
             requires_account: true,
             examples: vec![
-                "yacli mail send-published-link person@example.com \"Материалы\" \"Отправляю ссылку\" --public-url https://disk.yandex.ru/i/archive-link",
-                "yacli mail send-published-link person@example.com \"Материалы\" \"Отправляю ссылку\" --public-url https://disk.yandex.ru/i/archive-link --dry-run",
+                "yamcli mail send-published-link person@example.com \"Материалы\" \"Отправляю ссылку\" --public-url https://disk.yandex.ru/i/archive-link",
+                "yamcli mail send-published-link person@example.com \"Материалы\" \"Отправляю ссылку\" --public-url https://disk.yandex.ru/i/archive-link --dry-run",
             ],
         },
         GuideCommandEntry {
@@ -3659,7 +3666,7 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             topic: "calendar",
             summary: "Показать доступные календари через CalDAV.",
             requires_account: true,
-            examples: vec!["yacli calendar calendars"],
+            examples: vec!["yamcli calendar calendars"],
         },
         GuideCommandEntry {
             path: "calendar events",
@@ -3667,8 +3674,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Показать события в окне дат. По умолчанию используется календарь default и ближайшие 30 дней.",
             requires_account: true,
             examples: vec![
-                "yacli calendar events",
-                "yacli calendar events 2026-03-12 2026-03-19 --limit 20",
+                "yamcli calendar events",
+                "yamcli calendar events 2026-03-12 2026-03-19 --limit 20",
             ],
         },
         GuideCommandEntry {
@@ -3677,8 +3684,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Создать событие в выбранном календаре через CalDAV PUT.",
             requires_account: true,
             examples: vec![
-                "yacli calendar create \"Синк\" 2026-03-12T09:00:00Z 2026-03-12T10:00:00Z",
-                "yacli calendar create \"Синк\" 2026-03-12T09:00:00Z 2026-03-12T10:00:00Z --dry-run",
+                "yamcli calendar create \"Синк\" 2026-03-12T09:00:00Z 2026-03-12T10:00:00Z",
+                "yamcli calendar create \"Синк\" 2026-03-12T09:00:00Z 2026-03-12T10:00:00Z --dry-run",
             ],
         },
         GuideCommandEntry {
@@ -3686,21 +3693,21 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             topic: "calendar",
             summary: "Удалить событие по ID из выбранного календаря.",
             requires_account: true,
-            examples: vec!["yacli calendar delete <id>"],
+            examples: vec!["yamcli calendar delete <id>"],
         },
         GuideCommandEntry {
             path: "disk list",
             topic: "disk",
             summary: "Показать содержимое папки или метаданные ресурса в приватном Яндекс Диске. По умолчанию это root `disk:/`.",
             requires_account: true,
-            examples: vec!["yacli disk list", "yacli disk list disk:/docs --limit 50"],
+            examples: vec!["yamcli disk list", "yamcli disk list disk:/docs --limit 50"],
         },
         GuideCommandEntry {
             path: "disk mkdir",
             topic: "disk",
             summary: "Создать папку в приватном Яндекс Диске через REST API.",
             requires_account: true,
-            examples: vec!["yacli disk mkdir disk:/docs/archive"],
+            examples: vec!["yamcli disk mkdir disk:/docs/archive"],
         },
         GuideCommandEntry {
             path: "disk upload",
@@ -3708,8 +3715,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Загрузить локальный файл в приватный Яндекс Диск.",
             requires_account: true,
             examples: vec![
-                "yacli disk upload ./report.pdf disk:/docs/report.pdf",
-                "yacli disk upload ./report.pdf disk:/docs/report.pdf --dry-run",
+                "yamcli disk upload ./report.pdf disk:/docs/report.pdf",
+                "yamcli disk upload ./report.pdf disk:/docs/report.pdf --dry-run",
             ],
         },
         GuideCommandEntry {
@@ -3718,8 +3725,8 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Загрузить локальный файл на Диск и сразу получить public URL / public key.",
             requires_account: true,
             examples: vec![
-                "yacli disk upload-link --source ./report.pdf --path disk:/docs/report.pdf",
-                "yacli disk upload-link --source ./report.pdf --path disk:/docs/report.pdf --dry-run",
+                "yamcli disk upload-link --source ./report.pdf --path disk:/docs/report.pdf",
+                "yamcli disk upload-link --source ./report.pdf --path disk:/docs/report.pdf --dry-run",
             ],
         },
         GuideCommandEntry {
@@ -3727,28 +3734,28 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             topic: "disk",
             summary: "Скачать файл из приватного Яндекс Диска в локальный путь.",
             requires_account: true,
-            examples: vec!["yacli disk download disk:/docs/report.pdf --output ./report.pdf"],
+            examples: vec!["yamcli disk download disk:/docs/report.pdf --output ./report.pdf"],
         },
         GuideCommandEntry {
             path: "disk publish",
             topic: "disk",
             summary: "Опубликовать приватный файл или папку и получить public URL / public key.",
             requires_account: true,
-            examples: vec!["yacli disk publish disk:/docs/report.pdf"],
+            examples: vec!["yamcli disk publish disk:/docs/report.pdf"],
         },
         GuideCommandEntry {
             path: "disk unpublish",
             topic: "disk",
             summary: "Отозвать public URL / public key у приватного файла или папки.",
             requires_account: true,
-            examples: vec!["yacli disk unpublish disk:/docs/report.pdf"],
+            examples: vec!["yamcli disk unpublish disk:/docs/report.pdf"],
         },
         GuideCommandEntry {
             path: "disk info",
             topic: "disk",
             summary: "Показать приватную информацию о Диске по сохраненному токену.",
             requires_account: true,
-            examples: vec!["yacli disk info"],
+            examples: vec!["yamcli disk info"],
         },
         GuideCommandEntry {
             path: "disk public show",
@@ -3756,7 +3763,7 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Показать метаданные публичного файла или папки на Яндекс Диске.",
             requires_account: false,
             examples: vec![
-                "yacli disk public show --public-key https://disk.yandex.ru/i/WhGpLnQWR9efCA",
+                "yamcli disk public show --public-key https://disk.yandex.ru/i/WhGpLnQWR9efCA",
             ],
         },
         GuideCommandEntry {
@@ -3765,7 +3772,7 @@ fn all_guide_commands() -> Vec<GuideCommandEntry> {
             summary: "Скачать публичный файл с Яндекс Диска в локальный путь.",
             requires_account: false,
             examples: vec![
-                "yacli disk public download --public-key https://disk.yandex.ru/i/WhGpLnQWR9efCA --output ./sample.pdf",
+                "yamcli disk public download --public-key https://disk.yandex.ru/i/WhGpLnQWR9efCA --output ./sample.pdf",
             ],
         },
     ]
@@ -3779,10 +3786,10 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Прочитать письмо из Яндекс Почты",
             summary: "Полный поток от добавления аккаунта и логина до чтения письма по ID из списка.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli mail list --limit 10",
-                "yacli mail read <id>",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli mail list --limit 10",
+                "yamcli mail read <id>",
             ],
         },
         GuideWorkflowEntry {
@@ -3791,10 +3798,10 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Найти письмо по тексту",
             summary: "Поток от OAuth логина до поиска письма и открытия результата по ID.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli mail search \"смета\"",
-                "yacli mail read <id>",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli mail search \"смета\"",
+                "yamcli mail read <id>",
             ],
         },
         GuideWorkflowEntry {
@@ -3803,10 +3810,10 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Ответить на письмо",
             summary: "Поток от поиска письма до отправки ответа в тот же thread.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli mail search \"смета\"",
-                "yacli mail reply <id> \"Принято\"",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli mail search \"смета\"",
+                "yamcli mail reply <id> \"Принято\"",
             ],
         },
         GuideWorkflowEntry {
@@ -3815,10 +3822,10 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Переслать письмо",
             summary: "Поток от поиска письма до пересылки новому получателю вместе с вложениями.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli mail search \"смета\"",
-                "yacli mail forward <id> person@example.com \"FYI\"",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli mail search \"смета\"",
+                "yamcli mail forward <id> person@example.com \"FYI\"",
             ],
         },
         GuideWorkflowEntry {
@@ -3827,11 +3834,11 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Скачать вложение из письма",
             summary: "Поток от поиска письма до сохранения выбранного вложения в локальный файл.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli mail search \"счёт\"",
-                "yacli mail read <id>",
-                "yacli mail attachment export <id> --index 1 --output ./invoice.pdf",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli mail search \"счёт\"",
+                "yamcli mail read <id>",
+                "yamcli mail attachment export <id> --index 1 --output ./invoice.pdf",
             ],
         },
         GuideWorkflowEntry {
@@ -3840,11 +3847,11 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Разобрать приглашение из письма",
             summary: "Поток от поиска письма до чтения calendar invite из `.ics` или `text/calendar` вложения.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli mail search \"приглашение\"",
-                "yacli mail read <id>",
-                "yacli mail invite inspect <id> --index 1",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli mail search \"приглашение\"",
+                "yamcli mail read <id>",
+                "yamcli mail invite inspect <id> --index 1",
             ],
         },
         GuideWorkflowEntry {
@@ -3853,11 +3860,11 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Создать событие из приглашения в письме",
             summary: "Поток от поиска письма до импорта выбранного VEVENT в календарь через CalDAV.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli login calendar --app-password <app-password>",
-                "yacli mail search \"приглашение\"",
-                "yacli mail invite create-event <id> --index 1",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli login calendar --app-password <app-password>",
+                "yamcli mail search \"приглашение\"",
+                "yamcli mail invite create-event <id> --index 1",
             ],
         },
         GuideWorkflowEntry {
@@ -3866,8 +3873,8 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Посмотреть и скачать публичный файл с Диска",
             summary: "Read-only поток без локального аккаунта.",
             steps: vec![
-                "yacli disk public show --public-key <public-url-or-key>",
-                "yacli disk public download --public-key <public-url-or-key> --output ./file.bin",
+                "yamcli disk public show --public-key <public-url-or-key>",
+                "yamcli disk public download --public-key <public-url-or-key> --output ./file.bin",
             ],
         },
         GuideWorkflowEntry {
@@ -3875,7 +3882,11 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             topic: "disk",
             title: "Просмотреть приватный Яндекс Диск",
             summary: "Поток добавления аккаунта, OAuth-логина и просмотра содержимого папки.",
-            steps: vec!["yacli add me@yandex.ru", "yacli login", "yacli disk list"],
+            steps: vec![
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli disk list",
+            ],
         },
         GuideWorkflowEntry {
             id: "disk_write_flow",
@@ -3883,11 +3894,11 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Создать папку и загрузить файл на Диск",
             summary: "Поток от OAuth-логина до создания директории и загрузки локального файла.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli disk mkdir disk:/docs/archive",
-                "yacli disk upload ./report.pdf disk:/docs/archive/report.pdf",
-                "yacli disk list disk:/docs/archive --limit 50",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli disk mkdir disk:/docs/archive",
+                "yamcli disk upload ./report.pdf disk:/docs/archive/report.pdf",
+                "yamcli disk list disk:/docs/archive --limit 50",
             ],
         },
         GuideWorkflowEntry {
@@ -3896,12 +3907,12 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Подключить приватный Яндекс Диск",
             summary: "Поток добавления аккаунта и OAuth для приватного Диска.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli disk info",
-                "yacli disk list",
-                "yacli disk mkdir disk:/docs/archive",
-                "yacli disk upload ./report.pdf disk:/docs/archive/report.pdf",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli disk info",
+                "yamcli disk list",
+                "yamcli disk mkdir disk:/docs/archive",
+                "yamcli disk upload ./report.pdf disk:/docs/archive/report.pdf",
             ],
         },
         GuideWorkflowEntry {
@@ -3910,15 +3921,15 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Работать с несколькими почтовыми аккаунтами",
             summary: "Независимый доступ к нескольким ящикам через именованные аккаунты и `use`.",
             steps: vec![
-                "yacli add personal@yandex.ru",
-                "yacli add work@company.ru",
-                "yacli login",
-                "yacli use work",
-                "yacli login",
-                "yacli use personal",
-                "yacli mail list --limit 5",
-                "yacli use work",
-                "yacli mail list --limit 5",
+                "yamcli add personal@yandex.ru",
+                "yamcli add work@company.ru",
+                "yamcli login",
+                "yamcli use work",
+                "yamcli login",
+                "yamcli use personal",
+                "yamcli mail list --limit 5",
+                "yamcli use work",
+                "yamcli mail list --limit 5",
             ],
         },
         GuideWorkflowEntry {
@@ -3927,9 +3938,9 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Отправить письмо с вложением",
             summary: "Поток от OAuth логина до отправки письма через SMTP, включая локальный файл во вложении.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli mail send person@example.com \"Синк\" \"Привет\" --attach ./report.pdf",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli mail send person@example.com \"Синк\" \"Привет\" --attach ./report.pdf",
             ],
         },
         GuideWorkflowEntry {
@@ -3938,9 +3949,9 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Отправить ссылку на большой файл",
             summary: "Поток от OAuth логина до загрузки файла на Диск, публикации ссылки и отправки письма со ссылкой.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login",
-                "yacli mail send-link person@example.com \"Материалы\" \"Отправляю ссылку\" --source ./archive.zip --path disk:/docs/archive/archive.zip",
+                "yamcli add me@yandex.ru",
+                "yamcli login",
+                "yamcli mail send-link person@example.com \"Материалы\" \"Отправляю ссылку\" --source ./archive.zip --path disk:/docs/archive/archive.zip",
             ],
         },
         GuideWorkflowEntry {
@@ -3949,10 +3960,10 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Посмотреть календари и события",
             summary: "Поток от сохранения app password до чтения событий через CalDAV.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login calendar --app-password <app-password>",
-                "yacli calendar calendars",
-                "yacli calendar events",
+                "yamcli add me@yandex.ru",
+                "yamcli login calendar --app-password <app-password>",
+                "yamcli calendar calendars",
+                "yamcli calendar events",
             ],
         },
         GuideWorkflowEntry {
@@ -3961,10 +3972,10 @@ fn all_guide_workflows() -> Vec<GuideWorkflowEntry> {
             title: "Создать и удалить событие",
             summary: "Поток от логина до create/delete календарного события.",
             steps: vec![
-                "yacli add me@yandex.ru",
-                "yacli login calendar --app-password <app-password>",
-                "yacli calendar create \"Синк\" 2026-03-12T09:00:00Z 2026-03-12T10:00:00Z",
-                "yacli calendar delete <id>",
+                "yamcli add me@yandex.ru",
+                "yamcli login calendar --app-password <app-password>",
+                "yamcli calendar create \"Синк\" 2026-03-12T09:00:00Z 2026-03-12T10:00:00Z",
+                "yamcli calendar delete <id>",
             ],
         },
     ]
@@ -3980,7 +3991,7 @@ fn service_credential_ref(account: &AccountConfig, service: OauthService) -> Opt
 fn ensure_service_supports_oauth(account: &AccountConfig, service: OauthService) -> Result<()> {
     match service {
         OauthService::Mail if !matches!(account.mail.auth_mode, MailAuthMode::OauthXoauth2) => {
-            Err(YacliError::UnsupportedOperation(
+            Err(YamcliError::UnsupportedOperation(
                 "mail OAuth login requires account.mail.auth_mode=oauth_xoauth2".to_string(),
             ))
         }
@@ -3996,8 +4007,8 @@ fn oauth_login_services(
         Some(AuthServiceArg::Mail) => vec![OauthService::Mail],
         Some(AuthServiceArg::Disk) => vec![OauthService::Disk],
         Some(AuthServiceArg::Calendar) => {
-            return Err(YacliError::UnsupportedOperation(
-                "calendar does not use OAuth login in the stable surface; use `yacli login calendar --app-password <app-password>`".to_string(),
+            return Err(YamcliError::UnsupportedOperation(
+                "calendar does not use OAuth login in the stable surface; use `yamcli login calendar --app-password <app-password>`".to_string(),
             ));
         }
         None => {
@@ -4021,8 +4032,8 @@ fn oauth_service(value: AuthServiceArg) -> Result<OauthService> {
     match value {
         AuthServiceArg::Mail => Ok(OauthService::Mail),
         AuthServiceArg::Disk => Ok(OauthService::Disk),
-        AuthServiceArg::Calendar => Err(YacliError::UnsupportedOperation(
-            "calendar does not use OAuth login in the stable surface; use `yacli login calendar --app-password <app-password>`"
+        AuthServiceArg::Calendar => Err(YamcliError::UnsupportedOperation(
+            "calendar does not use OAuth login in the stable surface; use `yamcli login calendar --app-password <app-password>`"
                 .to_string(),
         )),
     }
@@ -4074,7 +4085,7 @@ fn read_confirmation_code(authorization_url: &str) -> Result<String> {
     io::stdin().read_line(&mut code)?;
     let code = code.trim().to_string();
     if code.is_empty() {
-        return Err(YacliError::Auth(
+        return Err(YamcliError::Auth(
             "для завершения входа нужен код подтверждения".to_string(),
         ));
     }
@@ -4147,7 +4158,7 @@ fn oauth_login_resume_command(
     client_id_source: &str,
     client_id: &str,
 ) -> String {
-    let mut command = format!("yacli login --account {}", shell_quote(account_name));
+    let mut command = format!("yamcli login --account {}", shell_quote(account_name));
     if services.len() == 1 {
         command.push_str(&format!(" --service {}", services[0].as_str()));
     }
@@ -4292,7 +4303,9 @@ fn resolve_disk_public_context(account: Option<&str>) -> Result<(Option<String>,
                 let account = store.get_account(&name)?;
                 Ok((Some(name), account.disk.rest_base_url.clone()))
             }
-            Err(YacliError::CurrentAccountMissing) => Ok((None, DEFAULT_DISK_BASE_URL.to_string())),
+            Err(YamcliError::CurrentAccountMissing) => {
+                Ok((None, DEFAULT_DISK_BASE_URL.to_string()))
+            }
             Err(err) => Err(err),
         },
     }

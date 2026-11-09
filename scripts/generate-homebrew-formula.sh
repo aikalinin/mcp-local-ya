@@ -11,7 +11,7 @@ SHA_LINUX_X64=""
 
 usage() {
     cat <<'EOF'
-Generate a Homebrew formula for a released yacli version.
+Generate a Homebrew formula for a released yamcli version.
 
 Usage:
   generate-homebrew-formula.sh \
@@ -81,7 +81,7 @@ mkdir -p "$(dirname "$OUTPUT")"
 
 {
     cat <<EOF
-class Yacli < Formula
+class Yamcli < Formula
   desc "Yandex Mail, Calendar, and Disk CLI for humans and AI agents"
   homepage "https://github.com/aikalinin/mcp-local-ya"
   version "${VERSION}"
@@ -96,10 +96,10 @@ EOF
         if [ -n "$SHA_MACOS_ARM64" ] && [ -n "$SHA_MACOS_X64" ]; then
             cat <<EOF
     if Hardware::CPU.arm?
-      url "${BASE_URL}/yacli-aarch64-apple-darwin.tar.gz"
+      url "${BASE_URL}/yamcli-aarch64-apple-darwin.tar.gz"
       sha256 "${SHA_MACOS_ARM64}"
     else
-      url "${BASE_URL}/yacli-x86_64-apple-darwin.tar.gz"
+      url "${BASE_URL}/yamcli-x86_64-apple-darwin.tar.gz"
       sha256 "${SHA_MACOS_X64}"
     end
 
@@ -107,20 +107,20 @@ EOF
         elif [ -n "$SHA_MACOS_ARM64" ]; then
             cat <<EOF
     if Hardware::CPU.arm?
-      url "${BASE_URL}/yacli-aarch64-apple-darwin.tar.gz"
+      url "${BASE_URL}/yamcli-aarch64-apple-darwin.tar.gz"
       sha256 "${SHA_MACOS_ARM64}"
     else
-      odie "yacli Homebrew packages are not published for macOS x86_64 yet."
+      odie "yamcli Homebrew packages are not published for macOS x86_64 yet."
     end
 
 EOF
         else
             cat <<EOF
     if Hardware::CPU.intel?
-      url "${BASE_URL}/yacli-x86_64-apple-darwin.tar.gz"
+      url "${BASE_URL}/yamcli-x86_64-apple-darwin.tar.gz"
       sha256 "${SHA_MACOS_X64}"
     else
-      odie "yacli Homebrew packages are not published for macOS arm64 yet."
+      odie "yamcli Homebrew packages are not published for macOS arm64 yet."
     end
 
 EOF
@@ -138,13 +138,13 @@ EOF
         if [ -n "$SHA_LINUX_ARM64" ] && [ -n "$SHA_LINUX_X64" ]; then
             cat <<EOF
     if Hardware::CPU.arm?
-      url "${BASE_URL}/yacli-aarch64-unknown-linux-gnu.tar.gz"
+      url "${BASE_URL}/yamcli-aarch64-unknown-linux-gnu.tar.gz"
       sha256 "${SHA_LINUX_ARM64}"
     elsif Hardware::CPU.intel?
-      url "${BASE_URL}/yacli-x86_64-unknown-linux-gnu.tar.gz"
+      url "${BASE_URL}/yamcli-x86_64-unknown-linux-gnu.tar.gz"
       sha256 "${SHA_LINUX_X64}"
     else
-      odie "yacli Homebrew packages are not published for this Linux CPU."
+      odie "yamcli Homebrew packages are not published for this Linux CPU."
     end
   end
 
@@ -152,10 +152,10 @@ EOF
         elif [ -n "$SHA_LINUX_ARM64" ]; then
             cat <<EOF
     if Hardware::CPU.arm?
-      url "${BASE_URL}/yacli-aarch64-unknown-linux-gnu.tar.gz"
+      url "${BASE_URL}/yamcli-aarch64-unknown-linux-gnu.tar.gz"
       sha256 "${SHA_LINUX_ARM64}"
     else
-      odie "yacli Homebrew packages are not published for Linux x86_64 yet."
+      odie "yamcli Homebrew packages are not published for Linux x86_64 yet."
     end
   end
 
@@ -163,10 +163,10 @@ EOF
         else
             cat <<EOF
     if Hardware::CPU.intel?
-      url "${BASE_URL}/yacli-x86_64-unknown-linux-gnu.tar.gz"
+      url "${BASE_URL}/yamcli-x86_64-unknown-linux-gnu.tar.gz"
       sha256 "${SHA_LINUX_X64}"
     else
-      odie "yacli Homebrew packages are not published for Linux arm64 yet."
+      odie "yamcli Homebrew packages are not published for Linux arm64 yet."
     end
   end
 
@@ -175,7 +175,7 @@ EOF
     else
         cat <<'EOF'
   on_linux do
-    odie "yacli Homebrew packages are not published for Linux yet. Use install.sh or cargo install."
+    odie "yamcli Homebrew packages are not published for Linux yet. Use install.sh or cargo install."
   end
 
 EOF
@@ -183,12 +183,12 @@ EOF
 
     cat <<'EOF'
   def install
-    bin.install "yacli"
+    bin.install "yamcli"
     doc.install "README.md", "LICENSE"
   end
 
   test do
-    output = shell_output("#{bin}/yacli --format json guide --topic disk")
+    output = shell_output("#{bin}/yamcli --format json guide --topic disk")
     assert_match "\"operation\":\"guide.show\"", output
   end
 end

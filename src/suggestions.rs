@@ -283,7 +283,7 @@ fn undo_command(entry: &ActivityEntry) -> Option<String> {
 
 fn revoke_public_link_command(entry: &ActivityEntry) -> Option<String> {
     undo_command(entry).or_else(|| {
-        extract_disk_path(&entry.replay_command).map(|path| format!("yacli disk unpublish {path}"))
+        extract_disk_path(&entry.replay_command).map(|path| format!("yamcli disk unpublish {path}"))
     })
 }
 
@@ -307,7 +307,7 @@ fn undo_activity_action(entry: &ActivityEntry) -> SuggestionAction {
         label: "Undo action",
         workflow_id: None,
         activity_id: Some(entry.id.clone()),
-        primary_tool: Some("yacli.activity.undo"),
+        primary_tool: Some("yamcli.activity.undo"),
         primary_operation: Some("activity.undo"),
         supports_review: false,
         tool_name: None,
@@ -662,7 +662,7 @@ fn build_live_mail_invite_suggestion(
     let subject = context.subject.unwrap_or("Без темы");
     let from = context.from.unwrap_or("-");
     let command = format!(
-        "yacli mail invite inspect --account {} --folder {} {} --index {}",
+        "yamcli mail invite inspect --account {} --folder {} {} --index {}",
         shell_quote(context.account),
         shell_quote(context.mailbox_name),
         context.message_uid,
@@ -690,7 +690,7 @@ fn build_live_mail_invite_suggestion(
         action: open_tool_action(
             Some("invite-to-calendar"),
             Some("mail.invite.inspect"),
-            "yacli.mail.invite.inspect",
+            "yamcli.mail.invite.inspect",
             json!({
                 "account": context.account,
                 "folder": context.mailbox_name,
@@ -715,7 +715,7 @@ fn build_live_mail_attachment_suggestion(
         suggested_attachment_output_path(attachment, context.message_uid, attachment_index);
     let oversized = message_size.is_some_and(is_oversized_mail_message);
     let command = format!(
-        "yacli mail attachment export --account {} --folder {} {} --index {} --output {}",
+        "yamcli mail attachment export --account {} --folder {} {} --index {} --output {}",
         shell_quote(context.account),
         shell_quote(context.mailbox_name),
         context.message_uid,
@@ -761,7 +761,7 @@ fn build_live_mail_attachment_suggestion(
         action: open_tool_action(
             Some("attachment-to-disk"),
             Some("mail.attachment.export"),
-            "yacli.mail.attachment.export",
+            "yamcli.mail.attachment.export",
             json!({
                 "account": context.account,
                 "folder": context.mailbox_name,
@@ -780,7 +780,7 @@ fn build_live_disk_public_link_suggestion(
     goal_workflow: Option<&str>,
 ) -> SuggestionItem {
     let command = format!(
-        "yacli disk unpublish --account {} {} --dry-run",
+        "yamcli disk unpublish --account {} {} --dry-run",
         shell_quote(account),
         shell_quote(&item.path)
     );
@@ -803,7 +803,7 @@ fn build_live_disk_public_link_suggestion(
         action: open_tool_action(
             Some("revoke-public-link"),
             Some("disk.unpublish"),
-            "yacli.disk.unpublish",
+            "yamcli.disk.unpublish",
             json!({
                 "account": account,
                 "path": item.path,
@@ -822,7 +822,7 @@ fn build_live_disk_send_link_suggestion(
     let subject = format!("Материалы: {}", item.name);
     let text = format!("Отправляю ссылку на файл {}.", item.name);
     let command = format!(
-        "yacli mail send-published-link <email> {} {} --public-url {} --dry-run",
+        "yamcli mail send-published-link <email> {} {} --public-url {} --dry-run",
         shell_quote(&subject),
         shell_quote(&text),
         shell_quote(public_url)
@@ -845,7 +845,7 @@ fn build_live_disk_send_link_suggestion(
         action: open_tool_action(
             Some("send-link-by-mail"),
             Some("mail.send_published_link"),
-            "yacli.mail.send_published_link",
+            "yamcli.mail.send_published_link",
             json!({
                 "account": account,
                 "subject": subject,
@@ -866,7 +866,7 @@ fn build_live_calendar_cancelled_suggestion(
     let summary = event.summary.as_deref().unwrap_or("Без названия");
     let start = event.start.as_deref().unwrap_or("-");
     let command = format!(
-        "yacli calendar delete --calendar {} {}",
+        "yamcli calendar delete --calendar {} {}",
         shell_quote(calendar_id),
         shell_quote(uid)
     );
@@ -888,7 +888,7 @@ fn build_live_calendar_cancelled_suggestion(
         action: open_tool_action(
             None,
             Some("calendar.delete"),
-            "yacli.calendar.delete",
+            "yamcli.calendar.delete",
             json!({
                 "account": account,
                 "calendar": calendar_id,
@@ -907,7 +907,7 @@ fn build_live_calendar_materials_suggestion(
     let summary = event.summary.as_deref().unwrap_or("Без названия");
     let start = event.start.as_deref().unwrap_or("-");
     let command = format!(
-        "yacli disk mkdir --account {} {}",
+        "yamcli disk mkdir --account {} {}",
         shell_quote(account),
         shell_quote(path)
     );
@@ -929,7 +929,7 @@ fn build_live_calendar_materials_suggestion(
         action: open_tool_action(
             None,
             Some("disk.mkdir"),
-            "yacli.disk.mkdir",
+            "yamcli.disk.mkdir",
             json!({
                 "account": account,
                 "path": path,
@@ -947,7 +947,7 @@ fn build_live_calendar_publish_materials_suggestion(
     let summary = event.summary.as_deref().unwrap_or("Без названия");
     let end = event.end.as_deref().unwrap_or("-");
     let command = format!(
-        "yacli disk publish --account {} {} --dry-run",
+        "yamcli disk publish --account {} {} --dry-run",
         shell_quote(account),
         shell_quote(&item.path)
     );
@@ -969,7 +969,7 @@ fn build_live_calendar_publish_materials_suggestion(
         action: open_tool_action(
             Some("publish-file-link"),
             Some("disk.publish"),
-            "yacli.disk.publish",
+            "yamcli.disk.publish",
             json!({
                 "account": account,
                 "path": item.path,
@@ -990,7 +990,7 @@ fn build_live_calendar_mail_follow_up_suggestion(
     let suggested_text =
         format!("Спасибо за встречу \"{event_summary}\". Отправляю follow-up по итогам.");
     let command = format!(
-        "yacli mail reply --account {} {} {}",
+        "yamcli mail reply --account {} {} {}",
         shell_quote(account),
         message.uid,
         shell_quote(&suggested_text)
@@ -1013,7 +1013,7 @@ fn build_live_calendar_mail_follow_up_suggestion(
         action: open_tool_action(
             Some("reply-with-context"),
             Some("mail.reply"),
-            "yacli.mail.reply",
+            "yamcli.mail.reply",
             json!({
                 "account": account,
                 "uid": message.uid,
@@ -1037,7 +1037,7 @@ fn build_live_calendar_mail_link_follow_up_suggestion(
     let suggested_text =
         format!("Спасибо за встречу \"{event_summary}\". Отправляю материалы: {public_url}");
     let command = format!(
-        "yacli mail reply --account {} {} {}",
+        "yamcli mail reply --account {} {} {}",
         shell_quote(account),
         message.uid,
         shell_quote(&suggested_text)
@@ -1060,7 +1060,7 @@ fn build_live_calendar_mail_link_follow_up_suggestion(
         action: open_tool_action(
             Some("reply-with-context"),
             Some("mail.reply"),
-            "yacli.mail.reply",
+            "yamcli.mail.reply",
             json!({
                 "account": account,
                 "uid": message.uid,
@@ -1359,9 +1359,9 @@ mod tests {
             account: "mock".to_string(),
             summary: "Публичная ссылка создана, но письмо не отправлено".to_string(),
             replay_command:
-                "yacli mail send-published-link andrei@nextstat.io \"Материалы\" --public-url https://disk.yandex.example/public".to_string(),
+                "yamcli mail send-published-link andrei@example.com \"Материалы\" --public-url https://disk.yandex.example/public".to_string(),
             undo: None,
-            undo_command: Some("yacli disk unpublish disk:/docs/archive.zip".to_string()),
+            undo_command: Some("yamcli disk unpublish disk:/docs/archive.zip".to_string()),
         }];
 
         let suggestions = collect_suggestions(&entries, Some("send-link-by-mail"));
@@ -1372,7 +1372,7 @@ mod tests {
         assert_eq!(suggestions[0].action.workflow_id, Some("send-link-by-mail"));
         assert_eq!(
             suggestions[0].action.primary_tool,
-            Some("yacli.mail.send_link")
+            Some("yamcli.mail.send_link")
         );
         assert!(suggestions[0].action.supports_review);
         assert_eq!(suggestions[1].kind, "cleanup");
@@ -1393,7 +1393,7 @@ mod tests {
             account: "mock".to_string(),
             summary: "Не удалось создать событие из приглашения письма 77: Ревью".to_string(),
             replay_command:
-                "yacli calendar create 'Ревью' '2026-03-16T10:00:00Z' '2026-03-16T10:30:00Z' --calendar team --dry-run"
+                "yamcli calendar create 'Ревью' '2026-03-16T10:00:00Z' '2026-03-16T10:30:00Z' --calendar team --dry-run"
                     .to_string(),
             undo: None,
             undo_command: None,
@@ -1407,7 +1407,7 @@ mod tests {
         assert_eq!(suggestions[0].action.kind, "open_workflow");
         assert_eq!(
             suggestions[0].action.primary_tool,
-            Some("yacli.mail.invite.create_event")
+            Some("yamcli.mail.invite.create_event")
         );
         assert!(!suggestions[0].action.supports_review);
     }
@@ -1454,7 +1454,7 @@ mod tests {
                 account: "mock",
                 mailbox_name: "INBOX",
                 message_uid: 1353,
-                subject: Some("Ревью yacli"),
+                subject: Some("Ревью yamcli"),
                 from: Some("organizer@example.com"),
             },
             1,
@@ -1466,11 +1466,11 @@ mod tests {
         assert_eq!(suggestion.action.kind, "open_tool");
         assert_eq!(
             suggestion.action.tool_name,
-            Some("yacli.mail.invite.inspect")
+            Some("yamcli.mail.invite.inspect")
         );
         assert_eq!(
             suggestion.action.primary_tool,
-            Some("yacli.mail.invite.inspect")
+            Some("yamcli.mail.invite.inspect")
         );
         assert_eq!(
             suggestion
@@ -1539,7 +1539,7 @@ mod tests {
         assert_eq!(suggestion.action.kind, "open_tool");
         assert_eq!(
             suggestion.action.tool_name,
-            Some("yacli.mail.attachment.export")
+            Some("yamcli.mail.attachment.export")
         );
         assert_eq!(
             suggestion
@@ -1585,7 +1585,7 @@ mod tests {
         assert_eq!(suggestion.workflow_id, Some("attachment-to-disk"));
         assert_eq!(
             suggestion.action.tool_name,
-            Some("yacli.mail.attachment.export")
+            Some("yamcli.mail.attachment.export")
         );
     }
 
@@ -1634,8 +1634,11 @@ mod tests {
         assert_eq!(suggestion.source, "disk_live");
         assert_eq!(suggestion.kind, "cleanup");
         assert_eq!(suggestion.action.kind, "open_tool");
-        assert_eq!(suggestion.action.tool_name, Some("yacli.disk.unpublish"));
-        assert_eq!(suggestion.action.primary_tool, Some("yacli.disk.unpublish"));
+        assert_eq!(suggestion.action.tool_name, Some("yamcli.disk.unpublish"));
+        assert_eq!(
+            suggestion.action.primary_tool,
+            Some("yamcli.disk.unpublish")
+        );
         assert_eq!(
             suggestion
                 .action
@@ -1670,7 +1673,7 @@ mod tests {
         assert_eq!(suggestion.action.kind, "open_tool");
         assert_eq!(
             suggestion.action.tool_name,
-            Some("yacli.mail.send_published_link")
+            Some("yamcli.mail.send_published_link")
         );
         assert!(!suggestion.action.supports_review);
         assert_eq!(
@@ -1723,7 +1726,7 @@ mod tests {
         assert_eq!(suggestion.source, "calendar_live");
         assert_eq!(suggestion.kind, "cleanup");
         assert_eq!(suggestion.action.kind, "open_tool");
-        assert_eq!(suggestion.action.tool_name, Some("yacli.calendar.delete"));
+        assert_eq!(suggestion.action.tool_name, Some("yamcli.calendar.delete"));
         assert_eq!(
             suggestion
                 .action
@@ -1781,7 +1784,7 @@ mod tests {
         assert_eq!(suggestion.source, "calendar_live");
         assert_eq!(suggestion.kind, "follow_up");
         assert_eq!(suggestion.action.kind, "open_tool");
-        assert_eq!(suggestion.action.tool_name, Some("yacli.disk.mkdir"));
+        assert_eq!(suggestion.action.tool_name, Some("yamcli.disk.mkdir"));
         assert_eq!(
             suggestion
                 .action
@@ -1868,7 +1871,7 @@ mod tests {
         assert_eq!(suggestion.kind, "follow_up");
         assert_eq!(suggestion.workflow_id, Some("publish-file-link"));
         assert_eq!(suggestion.action.kind, "open_tool");
-        assert_eq!(suggestion.action.tool_name, Some("yacli.disk.publish"));
+        assert_eq!(suggestion.action.tool_name, Some("yamcli.disk.publish"));
         assert!(suggestion.action.supports_review);
         assert_eq!(
             suggestion
@@ -1950,7 +1953,7 @@ mod tests {
         assert_eq!(suggestion.kind, "follow_up");
         assert_eq!(suggestion.workflow_id, Some("reply-with-context"));
         assert_eq!(suggestion.action.kind, "open_tool");
-        assert_eq!(suggestion.action.tool_name, Some("yacli.mail.reply"));
+        assert_eq!(suggestion.action.tool_name, Some("yamcli.mail.reply"));
         assert_eq!(
             suggestion
                 .action
@@ -2005,7 +2008,7 @@ mod tests {
         assert_eq!(suggestion.kind, "follow_up");
         assert_eq!(suggestion.workflow_id, Some("reply-with-context"));
         assert_eq!(suggestion.action.kind, "open_tool");
-        assert_eq!(suggestion.action.tool_name, Some("yacli.mail.reply"));
+        assert_eq!(suggestion.action.tool_name, Some("yamcli.mail.reply"));
         assert_eq!(
             suggestion
                 .action

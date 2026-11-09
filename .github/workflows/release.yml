@@ -21,23 +21,23 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            asset: yacli-x86_64-unknown-linux-gnu.tar.gz
+            asset: yamcli-x86_64-unknown-linux-gnu.tar.gz
             package_kind: unix
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            asset: yacli-aarch64-unknown-linux-gnu.tar.gz
+            asset: yamcli-aarch64-unknown-linux-gnu.tar.gz
             package_kind: unix
           - os: macos-15-intel
             target: x86_64-apple-darwin
-            asset: yacli-x86_64-apple-darwin.tar.gz
+            asset: yamcli-x86_64-apple-darwin.tar.gz
             package_kind: unix
           - os: macos-latest
             target: aarch64-apple-darwin
-            asset: yacli-aarch64-apple-darwin.tar.gz
+            asset: yamcli-aarch64-apple-darwin.tar.gz
             package_kind: unix
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            asset: yacli-x86_64-pc-windows-msvc.zip
+            asset: yamcli-x86_64-pc-windows-msvc.zip
             package_kind: windows
     steps:
       - uses: actions/checkout@v6
@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          asset_path="$(sh ./scripts/package-release.sh --target "${{ matrix.target }}" --binary "target/${{ matrix.target }}/release/yacli" --output-dir dist)"
+          asset_path="$(sh ./scripts/package-release.sh --target "${{ matrix.target }}" --binary "target/${{ matrix.target }}/release/yamcli" --output-dir dist)"
           asset_name="$(basename "$asset_path")"
           if command -v shasum >/dev/null 2>&1; then
             shasum -a 256 "$asset_path" | awk -v name="$asset_name" '{print $1 "  " name}' > "dist/SHA256SUMS-${{ matrix.target }}"
@@ -67,9 +67,9 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $stageDir = Join-Path $env:RUNNER_TEMP "yacli-${{ matrix.target }}"
+          $stageDir = Join-Path $env:RUNNER_TEMP "yamcli-${{ matrix.target }}"
           New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
-          Copy-Item "target/${{ matrix.target }}/release/yacli.exe" (Join-Path $stageDir "yacli.exe")
+          Copy-Item "target/${{ matrix.target }}/release/yamcli.exe" (Join-Path $stageDir "yamcli.exe")
           Copy-Item "README.md" (Join-Path $stageDir "README.md")
           Copy-Item "LICENSE" (Join-Path $stageDir "LICENSE")
           $assetPath = Join-Path (Resolve-Path dist) "${{ matrix.asset }}"
@@ -93,15 +93,15 @@ jobs:
       - name: Smoke packaged Linux x64 release asset
         shell: bash
         run: |
-          asset_path="$(find dist -type f -name 'yacli-x86_64-unknown-linux-gnu.tar.gz' | head -n 1)"
+          asset_path="$(find dist -type f -name 'yamcli-x86_64-unknown-linux-gnu.tar.gz' | head -n 1)"
           test -n "$asset_path"
           smoke_dir="$(mktemp -d)"
           trap 'rm -rf "$smoke_dir"' EXIT INT TERM HUP
           tar -xzf "$asset_path" -C "$smoke_dir"
-          binary_path="$(find "$smoke_dir" -type f -name yacli | head -n 1)"
+          binary_path="$(find "$smoke_dir" -type f -name yamcli | head -n 1)"
           test -n "$binary_path"
           chmod +x "$binary_path"
-          YACLI_EXPECT_SECRET_BACKEND=keyring sh ./scripts/smoke-product-surface.sh "$binary_path"
+          YAMCLI_EXPECT_SECRET_BACKEND=keyring sh ./scripts/smoke-product-surface.sh "$binary_path"
       - name: Assemble release checksums
         shell: bash
         run: |
@@ -114,11 +114,11 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           base_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
-          sha_linux_arm64="$(awk '$2 == "yacli-aarch64-unknown-linux-gnu.tar.gz" { print $1 }' dist/SHA256SUMS)"
-          sha_linux_x64="$(awk '$2 == "yacli-x86_64-unknown-linux-gnu.tar.gz" { print $1 }' dist/SHA256SUMS)"
-          sha_macos_arm64="$(awk '$2 == "yacli-aarch64-apple-darwin.tar.gz" { print $1 }' dist/SHA256SUMS)"
-          sha_macos_x64="$(awk '$2 == "yacli-x86_64-apple-darwin.tar.gz" { print $1 }' dist/SHA256SUMS)"
-          sha_windows_x64="$(awk '$2 == "yacli-x86_64-pc-windows-msvc.zip" { print $1 }' dist/SHA256SUMS)"
+          sha_linux_arm64="$(awk '$2 == "yamcli-aarch64-unknown-linux-gnu.tar.gz" { print $1 }' dist/SHA256SUMS)"
+          sha_linux_x64="$(awk '$2 == "yamcli-x86_64-unknown-linux-gnu.tar.gz" { print $1 }' dist/SHA256SUMS)"
+          sha_macos_arm64="$(awk '$2 == "yamcli-aarch64-apple-darwin.tar.gz" { print $1 }' dist/SHA256SUMS)"
+          sha_macos_x64="$(awk '$2 == "yamcli-x86_64-apple-darwin.tar.gz" { print $1 }' dist/SHA256SUMS)"
+          sha_windows_x64="$(awk '$2 == "yamcli-x86_64-pc-windows-msvc.zip" { print $1 }' dist/SHA256SUMS)"
 
           test -n "$sha_linux_arm64"
           test -n "$sha_linux_x64"
@@ -129,7 +129,7 @@ jobs:
           sh ./scripts/generate-homebrew-formula.sh \
             --version "$version" \
             --base-url "$base_url" \
-            --output dist/yacli.rb \
+            --output dist/yamcli.rb \
             --sha256-linux-arm64 "$sha_linux_arm64" \
             --sha256-linux-x64 "$sha_linux_x64" \
             --sha256-macos-arm64 "$sha_macos_arm64" \
@@ -143,15 +143,15 @@ jobs:
 
           (
             cd dist/winget-manifests
-            zip -r ../winget-manifests.zip NextStat.yacli
+            zip -r ../winget-manifests.zip aikalinin.yamcli
           )
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            dist/**/yacli-*.tar.gz
-            dist/**/yacli-*.zip
+            dist/**/yamcli-*.tar.gz
+            dist/**/yamcli-*.zip
             dist/SHA256SUMS
-            dist/yacli.rb
+            dist/yamcli.rb
             dist/winget-manifests.zip

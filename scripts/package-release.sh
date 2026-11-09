@@ -7,7 +7,7 @@ OUTPUT_DIR=""
 
 usage() {
     cat <<'EOF'
-Package a built yacli binary into a release archive.
+Package a built yamcli binary into a release archive.
 
 Usage:
   package-release.sh --target TARGET --binary PATH --output-dir DIR
@@ -50,8 +50,8 @@ if [ ! -f "$BINARY" ]; then
     exit 1
 fi
 
-asset_base="yacli-${TARGET}"
-tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/yacli-package.XXXXXX")"
+asset_base="yamcli-${TARGET}"
+tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/yamcli-package.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT INT TERM HUP
 
 stage_dir="${tmp_dir}/${asset_base}"

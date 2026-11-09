@@ -2,7 +2,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::calendar::{CalendarCreateRequest, CalendarInvite, calendar_create_command};
-use crate::error::YacliError;
+use crate::error::YamcliError;
 use crate::mail::{InspectedMailInvite, MailAttachmentSelector};
 
 #[derive(Clone, Debug, Serialize)]
@@ -50,7 +50,7 @@ pub fn invite_create_event_command(
     event_index: usize,
 ) -> String {
     let mut command = format!(
-        "yacli mail invite create-event {} --folder {} --calendar {} --event-index {}",
+        "yamcli mail invite create-event {} --folder {} --calendar {} --event-index {}",
         uid,
         shell_quote(folder),
         shell_quote(calendar),
@@ -74,7 +74,7 @@ pub fn partial_failure(
     folder: &str,
     selector: &MailAttachmentSelector,
     max_bytes: u64,
-    err: YacliError,
+    err: YamcliError,
 ) -> MailInviteCreateEventPartialFailure {
     MailInviteCreateEventPartialFailure {
         attachment: attachment.clone(),
@@ -88,7 +88,7 @@ pub fn partial_failure(
         },
         recovery: MailInviteCreateEventRecovery {
             inspect_invite: InspectInviteRecovery {
-                tool: "yacli.mail.invite.inspect".to_string(),
+                tool: "yamcli.mail.invite.inspect".to_string(),
                 command: inspect_invite_command(
                     attachment.message_uid,
                     folder,
@@ -103,7 +103,7 @@ pub fn partial_failure(
                 ),
             },
             retry_calendar_step: RetryCalendarStepRecovery {
-                tool: "yacli.calendar.create".to_string(),
+                tool: "yamcli.calendar.create".to_string(),
                 command: calendar_create_command(create_request, true),
                 arguments: json!({
                     "calendar": create_request.calendar,
@@ -126,7 +126,7 @@ pub fn inspect_invite_command(
     max_bytes: u64,
 ) -> String {
     let mut command = format!(
-        "yacli mail invite inspect {} --folder {}",
+        "yamcli mail invite inspect {} --folder {}",
         uid,
         shell_quote(folder)
     );
@@ -184,7 +184,7 @@ mod tests {
 
     use super::{inspect_invite_arguments, invite_create_event_command, partial_failure};
     use crate::calendar::{CalendarCreateRequest, CalendarInvite};
-    use crate::error::YacliError;
+    use crate::error::YamcliError;
     use crate::mail::{InspectedMailInvite, MailAttachmentSelector};
 
     #[test]
@@ -224,18 +224,18 @@ mod tests {
             "Inbox",
             &MailAttachmentSelector::Filename("invite.ics".to_string()),
             2 * 1024 * 1024,
-            YacliError::Network("calendar offline".to_string()),
+            YamcliError::Network("calendar offline".to_string()),
         );
 
         assert_eq!(partial.failed_stage, "calendar_create");
         assert_eq!(partial.error.code, "NETWORK_ERROR");
         assert_eq!(
             partial.recovery.inspect_invite.tool,
-            "yacli.mail.invite.inspect"
+            "yamcli.mail.invite.inspect"
         );
         assert_eq!(
             partial.recovery.retry_calendar_step.tool,
-            "yacli.calendar.create"
+            "yamcli.calendar.create"
         );
         assert!(
             partial

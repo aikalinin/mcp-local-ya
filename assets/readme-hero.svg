@@ -27,7 +27,7 @@
   <circle cx="126" cy="115" r="10" fill="url(#accent)"/>
   <text x="150" y="124" fill="#F8FAFC" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="28" font-weight="700">CLI + MCP + Apps</text>
 
-  <text x="92" y="232" fill="#F8FAFC" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="118" font-weight="900">yacli</text>
+  <text x="92" y="232" fill="#F8FAFC" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="118" font-weight="900">yamcli</text>
   <text x="92" y="296" fill="#B9C5E3" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="40" font-weight="700">Яндекс Почта, Календарь, Диск</text>
   <text x="92" y="356" fill="#E2E8F0" font-family="SF Pro Display, Inter, Arial, sans-serif" font-size="32" font-weight="500">Один интерфейс для людей, агентов и MCP Apps.</text>
 

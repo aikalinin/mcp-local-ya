@@ -2751,8 +2751,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "yacli"
-version = "0.5.5"
+name = "yamcli"
+version = "1.0.0"
 dependencies = [
  "assert_cmd",
  "axum",

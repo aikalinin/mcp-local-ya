@@ -1,9 +1,9 @@
 use std::process;
 
-use yacli::cli::{Command, McpTransportArg, parse_cli};
-use yacli::commands::execute;
-use yacli::mcp::server::{serve_http, serve_stdio};
-use yacli::output::emit;
+use yamcli::cli::{Command, McpTransportArg, parse_cli};
+use yamcli::commands::execute;
+use yamcli::mcp::server::{serve_http, serve_stdio};
+use yamcli::output::emit;
 
 fn main() {
     let cli = parse_cli();

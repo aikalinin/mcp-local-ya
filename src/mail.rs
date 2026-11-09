@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 use tempfile::NamedTempFile;
 
 use crate::calendar::{CalendarInvite, parse_calendar_invites};
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 
 const IMAP_TIMEOUT_SECS: u64 = 20;
 const SMTP_TIMEOUT_SECS: u64 = 20;
@@ -150,7 +150,7 @@ pub struct MailDraftLocation {
     pub uid: Option<u64>,
 }
 
-/// How an outgoing message leaves yacli.
+/// How an outgoing message leaves yamcli.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MailDelivery<'a> {
     /// Submit over SMTP right away.
@@ -428,12 +428,12 @@ pub fn read_mail_message(
     max_bytes: u64,
 ) -> Result<MailMessage> {
     if uid == 0 {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail read <id> must be greater than zero".to_string(),
         ));
     }
     if max_bytes == 0 {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail read --max-bytes must be greater than zero".to_string(),
         ));
     }
@@ -448,8 +448,8 @@ pub fn read_mail_message(
         && size > max_bytes
     {
         let _ = session.logout();
-        return Err(YacliError::UnsupportedOperation(format!(
-            "message id {} size {} exceeds --max-bytes {}; rerun `yacli mail read {} --max-bytes {}`",
+        return Err(YamcliError::UnsupportedOperation(format!(
+            "message id {} size {} exceeds --max-bytes {}; rerun `yamcli mail read {} --max-bytes {}`",
             uid, size, max_bytes, uid, size
         )));
     }
@@ -498,7 +498,7 @@ fn submit_over_smtp(
     ensure_smtp_safe_submission(&prepared)?;
     let mut session = SmtpSession::connect(smtp_host, smtp_port)?;
     session.read_greeting(smtp_host)?;
-    session.ehlo("yacli.nextstat.dev")?;
+    session.ehlo("onega.io")?;
     match &prepared.auth {
         MailSmtpAuth::OauthXoauth2 {
             account,
@@ -637,7 +637,7 @@ pub fn reply_to_mail_message(
     delivery: MailDelivery<'_>,
 ) -> Result<RepliedMail> {
     if request.uid == 0 {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail reply <id> must be greater than zero".to_string(),
         ));
     }
@@ -692,7 +692,7 @@ pub fn forward_mail_message(
     delivery: MailDelivery<'_>,
 ) -> Result<ForwardedMail> {
     if request.uid == 0 {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail forward <id> must be greater than zero".to_string(),
         ));
     }
@@ -859,16 +859,16 @@ impl SmtpSession<native_tls::TlsStream<TcpStream>> {
     fn connect(smtp_host: &str, smtp_port: u16) -> Result<Self> {
         let address = format!("{smtp_host}:{smtp_port}");
         let tcp = TcpStream::connect(&address).map_err(|err| {
-            YacliError::Network(format!("failed to connect to SMTP server {address}: {err}"))
+            YamcliError::Network(format!("failed to connect to SMTP server {address}: {err}"))
         })?;
         tcp.set_read_timeout(Some(Duration::from_secs(SMTP_TIMEOUT_SECS)))?;
         tcp.set_write_timeout(Some(Duration::from_secs(SMTP_TIMEOUT_SECS)))?;
 
         let connector = TlsConnector::new().map_err(|err| {
-            YacliError::Network(format!("failed to initialize TLS connector: {err}"))
+            YamcliError::Network(format!("failed to initialize TLS connector: {err}"))
         })?;
         let tls = connector.connect(smtp_host, tcp).map_err(|err| {
-            YacliError::Network(format!(
+            YamcliError::Network(format!(
                 "failed to establish TLS session with {smtp_host}: {err}"
             ))
         })?;
@@ -881,16 +881,16 @@ impl ImapSession {
     fn connect(imap_host: &str, imap_port: u16) -> Result<Self> {
         let address = format!("{imap_host}:{imap_port}");
         let tcp = TcpStream::connect(&address).map_err(|err| {
-            YacliError::Network(format!("failed to connect to IMAP server {address}: {err}"))
+            YamcliError::Network(format!("failed to connect to IMAP server {address}: {err}"))
         })?;
         tcp.set_read_timeout(Some(Duration::from_secs(IMAP_TIMEOUT_SECS)))?;
         tcp.set_write_timeout(Some(Duration::from_secs(IMAP_TIMEOUT_SECS)))?;
 
         let connector = TlsConnector::new().map_err(|err| {
-            YacliError::Network(format!("failed to initialize TLS connector: {err}"))
+            YamcliError::Network(format!("failed to initialize TLS connector: {err}"))
         })?;
         let tls = connector.connect(imap_host, tcp).map_err(|err| {
-            YacliError::Network(format!(
+            YamcliError::Network(format!(
                 "failed to establish TLS session with {imap_host}: {err}"
             ))
         })?;
@@ -901,7 +901,7 @@ impl ImapSession {
         };
         let greeting = session.read_line()?;
         if !greeting.starts_with("* OK") {
-            return Err(YacliError::Api(format!(
+            return Err(YamcliError::Api(format!(
                 "unexpected IMAP greeting from {imap_host}: {}",
                 greeting.trim()
             )));
@@ -997,7 +997,7 @@ impl<S: Read + Write> ImapSession<S> {
 
         let continuation = self.read_line()?;
         if !continuation.starts_with('+') {
-            return Err(YacliError::Api(format!(
+            return Err(YamcliError::Api(format!(
                 "IMAP UID SEARCH literal was not accepted: {continuation}"
             )));
         }
@@ -1061,7 +1061,7 @@ impl<S: Read + Write> ImapSession<S> {
             let line = self.read_line()?;
             if line.starts_with(&tag) {
                 parse_tagged_status(&tag, &line, "IMAP UID FETCH", TaggedErrorKind::Api)?;
-                return Err(YacliError::Api(format!(
+                return Err(YamcliError::Api(format!(
                     "message uid {} not found in folder",
                     uid
                 )));
@@ -1070,7 +1070,7 @@ impl<S: Read + Write> ImapSession<S> {
             if line.starts_with("* ") && line.contains(" FETCH (") {
                 let metadata = parse_fetch_metadata(&line)?;
                 if metadata.uid != uid {
-                    return Err(YacliError::Serialization(format!(
+                    return Err(YamcliError::Serialization(format!(
                         "IMAP FETCH returned uid {} while requesting uid {}",
                         metadata.uid, uid
                     )));
@@ -1099,7 +1099,7 @@ impl<S: Read + Write> ImapSession<S> {
             let line = self.read_line()?;
             if line.starts_with(&tag) {
                 parse_tagged_status(&tag, &line, "IMAP UID FETCH", TaggedErrorKind::Api)?;
-                return Err(YacliError::Api(format!(
+                return Err(YamcliError::Api(format!(
                     "message uid {} not found in folder",
                     uid
                 )));
@@ -1107,7 +1107,7 @@ impl<S: Read + Write> ImapSession<S> {
 
             if line.starts_with("* ") && line.contains(" FETCH (") {
                 let literal_len = extract_trailing_literal_len(&line)?.ok_or_else(|| {
-                    YacliError::Serialization(format!(
+                    YamcliError::Serialization(format!(
                         "missing RFC822 literal in IMAP FETCH response: {line}"
                     ))
                 })?;
@@ -1156,7 +1156,7 @@ impl<S: Read + Write> ImapSession<S> {
             if line.starts_with(&tag) {
                 parse_tagged_status(&tag, &line, "IMAP APPEND", TaggedErrorKind::Api)?;
             }
-            return Err(YacliError::Api(format!(
+            return Err(YamcliError::Api(format!(
                 "IMAP APPEND literal was not accepted: {line}"
             )));
         }
@@ -1212,7 +1212,7 @@ impl<S: Read + Write> ImapSession<S> {
         let mut line = String::new();
         let read = self.reader.read_line(&mut line)?;
         if read == 0 {
-            return Err(YacliError::Network(
+            return Err(YamcliError::Network(
                 "IMAP server closed the connection unexpectedly".to_string(),
             ));
         }
@@ -1275,9 +1275,9 @@ impl<S: Read + Write> SmtpSession<S> {
                 let detail = decode_smtp_auth_challenge(&response)
                     .or_else(|| smtp_response_detail(&final_response))
                     .unwrap_or_else(|| flatten_smtp_response(&final_response));
-                Err(YacliError::Auth(format!("{action} failed: {detail}")))
+                Err(YamcliError::Auth(format!("{action} failed: {detail}")))
             }
-            _ => Err(YacliError::Auth(format!(
+            _ => Err(YamcliError::Auth(format!(
                 "{action} failed: {}",
                 flatten_smtp_response(&response)
             ))),
@@ -1344,16 +1344,16 @@ impl<S: Read + Write> SmtpSession<S> {
         loop {
             let line = self.read_line()?;
             if line.len() < 3 {
-                return Err(YacliError::Serialization(format!(
+                return Err(YamcliError::Serialization(format!(
                     "SMTP response line is too short: {line}"
                 )));
             }
             let code = line[..3].parse::<u16>().map_err(|err| {
-                YacliError::Serialization(format!("invalid SMTP status code in `{line}`: {err}"))
+                YamcliError::Serialization(format!("invalid SMTP status code in `{line}`: {err}"))
             })?;
             if let Some(expected) = expected_code {
                 if code != expected {
-                    return Err(YacliError::Serialization(format!(
+                    return Err(YamcliError::Serialization(format!(
                         "SMTP multiline response mixed status codes: expected {expected}, got {code}"
                     )));
                 }
@@ -1369,7 +1369,7 @@ impl<S: Read + Write> SmtpSession<S> {
                 }
                 b'-' => continue,
                 _ => {
-                    return Err(YacliError::Serialization(format!(
+                    return Err(YamcliError::Serialization(format!(
                         "SMTP response missing separator after status code: {line}"
                     )));
                 }
@@ -1381,7 +1381,7 @@ impl<S: Read + Write> SmtpSession<S> {
         let mut line = String::new();
         let read = self.reader.read_line(&mut line)?;
         if read == 0 {
-            return Err(YacliError::Network(
+            return Err(YamcliError::Network(
                 "SMTP server closed the connection unexpectedly".to_string(),
             ));
         }
@@ -1395,12 +1395,12 @@ fn build_xoauth2_payload(account: &str, access_token: &str) -> String {
 
 fn validate_mail_summary_limit(action: &str, limit: usize) -> Result<()> {
     if limit == 0 {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{action} --limit must be greater than zero"
         )));
     }
     if limit > 100 {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{action} --limit must be 100 or less"
         )));
     }
@@ -1411,12 +1411,12 @@ fn validate_mail_summary_limit(action: &str, limit: usize) -> Result<()> {
 fn normalize_search_query(query: &str) -> Result<String> {
     let query = query.trim();
     if query.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail search text must not be empty".to_string(),
         ));
     }
     if query.contains('\r') || query.contains('\n') {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail search text must not contain CR or LF characters".to_string(),
         ));
     }
@@ -1430,7 +1430,7 @@ fn parse_search_uids(lines: &[String]) -> Result<Vec<u64>> {
         if let Some(rest) = line.strip_prefix("* SEARCH") {
             for token in rest.split_whitespace() {
                 let uid = token.parse::<u64>().map_err(|err| {
-                    YacliError::Serialization(format!("invalid IMAP SEARCH uid `{token}`: {err}"))
+                    YamcliError::Serialization(format!("invalid IMAP SEARCH uid `{token}`: {err}"))
                 })?;
                 uids.push(uid);
             }
@@ -1472,19 +1472,20 @@ fn starts_with_ascii_case(value: &str, prefix: &str) -> bool {
 }
 
 fn build_reply_target(headers: &[u8]) -> Result<MailReplyTarget> {
-    let (parsed, _) = mailparse::parse_headers(headers)
-        .map_err(|err| YacliError::Serialization(format!("failed to parse mail headers: {err}")))?;
+    let (parsed, _) = mailparse::parse_headers(headers).map_err(|err| {
+        YamcliError::Serialization(format!("failed to parse mail headers: {err}"))
+    })?;
 
     let reply_to = parsed.get_first_value("Reply-To");
     let from = parsed.get_first_value("From");
     let recipient_header = reply_to.or(from).ok_or_else(|| {
-        YacliError::Serialization("reply target has no Reply-To or From header".to_string())
+        YamcliError::Serialization("reply target has no Reply-To or From header".to_string())
     })?;
     let recipient = extract_primary_recipient(&recipient_header)?;
 
     let subject = parsed.get_first_value("Subject").unwrap_or_default();
     let message_id = parsed.get_first_value("Message-ID").ok_or_else(|| {
-        YacliError::Serialization("reply target has no Message-ID header".to_string())
+        YamcliError::Serialization("reply target has no Message-ID header".to_string())
     })?;
     let references =
         normalize_references_header(parsed.get_first_value("References").as_deref(), &message_id)?;
@@ -1499,7 +1500,7 @@ fn build_reply_target(headers: &[u8]) -> Result<MailReplyTarget> {
 
 fn extract_primary_recipient(header_value: &str) -> Result<String> {
     let addresses = addrparse(header_value).map_err(|err| {
-        YacliError::Serialization(format!("failed to parse reply recipient header: {err}"))
+        YamcliError::Serialization(format!("failed to parse reply recipient header: {err}"))
     })?;
 
     for address in addresses.iter() {
@@ -1513,7 +1514,7 @@ fn extract_primary_recipient(header_value: &str) -> Result<String> {
         }
     }
 
-    Err(YacliError::Serialization(
+    Err(YamcliError::Serialization(
         "reply target header does not contain a usable recipient address".to_string(),
     ))
 }
@@ -1565,7 +1566,7 @@ fn prepare_mail_submission(
     let cc = normalize_recipient_list(request.cc, "mail send --cc")?;
     let bcc = normalize_recipient_list(request.bcc, "mail send --bcc")?;
     if to.is_empty() && cc.is_empty() && bcc.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail send requires at least one recipient".to_string(),
         ));
     }
@@ -1650,7 +1651,7 @@ fn ensure_smtp_safe_submission(prepared: &PreparedMailSubmission) -> Result<()> 
             .as_deref()
             .map(|path| format!(" Suggested disk path: `{path}`."))
             .unwrap_or_default();
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "{} Используйте workflow `{}` вместо прямой SMTP-отправки больших вложений.{}",
             remediation.reason, remediation.workflow, suggested_path
         )));
@@ -1661,7 +1662,7 @@ fn ensure_smtp_safe_submission(prepared: &PreparedMailSubmission) -> Result<()> 
 
 fn normalize_forward_request(request: MailForwardRequest) -> Result<NormalizedForwardRequest> {
     if request.max_source_bytes == 0 {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail forward --max-source-bytes must be greater than zero".to_string(),
         ));
     }
@@ -1670,7 +1671,7 @@ fn normalize_forward_request(request: MailForwardRequest) -> Result<NormalizedFo
     let cc = normalize_recipient_list(request.cc, "mail forward --cc")?;
     let bcc = normalize_recipient_list(request.bcc, "mail forward --bcc")?;
     if to.is_empty() && cc.is_empty() && bcc.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail forward requires at least one recipient".to_string(),
         ));
     }
@@ -1889,7 +1890,7 @@ fn parse_tagged_status(
     error_kind: TaggedErrorKind,
 ) -> Result<()> {
     let Some(rest) = line.strip_prefix(tag) else {
-        return Err(YacliError::Api(format!(
+        return Err(YamcliError::Api(format!(
             "{action} returned unexpected tagged response: {line}"
         )));
     };
@@ -1905,8 +1906,8 @@ fn parse_tagged_status(
         if detail.is_empty() { line } else { detail }
     );
     match error_kind {
-        TaggedErrorKind::Auth => Err(YacliError::Auth(message)),
-        TaggedErrorKind::Api => Err(YacliError::Api(message)),
+        TaggedErrorKind::Auth => Err(YamcliError::Auth(message)),
+        TaggedErrorKind::Api => Err(YamcliError::Api(message)),
     }
 }
 
@@ -1916,7 +1917,7 @@ fn ensure_smtp_code(response: &SmtpResponse, expected: &[u16], action: &str) -> 
     }
 
     let message = format!("{action} failed: {}", flatten_smtp_response(response));
-    Err(YacliError::Api(message))
+    Err(YamcliError::Api(message))
 }
 
 fn flatten_smtp_response(response: &SmtpResponse) -> String {
@@ -1968,7 +1969,7 @@ fn build_message_summary(metadata: FetchMetadata, headers: &[u8]) -> Result<Mail
         (None, None, None)
     } else {
         let (parsed, _) = mailparse::parse_headers(headers).map_err(|err| {
-            YacliError::Serialization(format!("failed to parse mail headers: {err}"))
+            YamcliError::Serialization(format!("failed to parse mail headers: {err}"))
         })?;
         (
             parsed.get_first_value("Subject"),
@@ -1996,7 +1997,7 @@ fn build_read_message(
         (None, None, None, None, None, None)
     } else {
         let (parsed, _) = mailparse::parse_headers(headers).map_err(|err| {
-            YacliError::Serialization(format!("failed to parse mail headers: {err}"))
+            YamcliError::Serialization(format!("failed to parse mail headers: {err}"))
         })?;
         (
             parsed.get_first_value("Subject"),
@@ -2009,7 +2010,7 @@ fn build_read_message(
     };
 
     let parsed_mail = mailparse::parse_mail(raw_message).map_err(|err| {
-        YacliError::Serialization(format!("failed to parse RFC822 message: {err}"))
+        YamcliError::Serialization(format!("failed to parse RFC822 message: {err}"))
     })?;
     let extracted = extract_message_content(&parsed_mail)?;
 
@@ -2069,7 +2070,7 @@ fn extract_message_content(
 
         if is_attachment {
             let payload = part.get_body_raw().map_err(|err| {
-                YacliError::Serialization(format!("failed to decode attachment payload: {err}"))
+                YamcliError::Serialization(format!("failed to decode attachment payload: {err}"))
             })?;
             content.attachment_parts.push(MailAttachmentPart {
                 filename,
@@ -2084,14 +2085,14 @@ fn extract_message_content(
         match mime_type.as_str() {
             "text/plain" if content.text_body.is_none() => {
                 content.text_body = Some(part.get_body().map_err(|err| {
-                    YacliError::Serialization(format!(
+                    YamcliError::Serialization(format!(
                         "failed to decode text/plain message body: {err}"
                     ))
                 })?);
             }
             "text/html" if content.html_body.is_none() => {
                 content.html_body = Some(part.get_body().map_err(|err| {
-                    YacliError::Serialization(format!(
+                    YamcliError::Serialization(format!(
                         "failed to decode text/html message body: {err}"
                     ))
                 })?);
@@ -2103,7 +2104,7 @@ fn extract_message_content(
     if content.text_body.is_none() && content.html_body.is_none() && parsed_mail.subparts.is_empty()
     {
         content.text_body = Some(parsed_mail.get_body().map_err(|err| {
-            YacliError::Serialization(format!("failed to decode single-part message body: {err}"))
+            YamcliError::Serialization(format!("failed to decode single-part message body: {err}"))
         })?);
     }
 
@@ -2115,14 +2116,14 @@ fn ensure_fetch_literal_closed(trailer: &str) -> Result<()> {
         return Ok(());
     }
 
-    Err(YacliError::Serialization(format!(
+    Err(YamcliError::Serialization(format!(
         "unexpected IMAP FETCH literal trailer: {trailer}"
     )))
 }
 
 fn extract_u64_after_keyword(line: &str, keyword: &str) -> Result<u64> {
     extract_optional_u64_after_keyword(line, keyword)?.ok_or_else(|| {
-        YacliError::Serialization(format!(
+        YamcliError::Serialization(format!(
             "missing `{keyword}` in IMAP FETCH response: {line}"
         ))
     })
@@ -2138,13 +2139,13 @@ fn extract_optional_u64_after_keyword(line: &str, keyword: &str) -> Result<Optio
         .take_while(|ch| ch.is_ascii_digit())
         .collect::<String>();
     if digits.is_empty() {
-        return Err(YacliError::Serialization(format!(
+        return Err(YamcliError::Serialization(format!(
             "expected digits after `{keyword}` in IMAP FETCH response: {line}"
         )));
     }
 
     let value = digits.parse::<u64>().map_err(|err| {
-        YacliError::Serialization(format!(
+        YamcliError::Serialization(format!(
             "invalid numeric value after `{keyword}` in IMAP FETCH response: {err}"
         ))
     })?;
@@ -2157,7 +2158,7 @@ fn extract_flags(line: &str) -> Result<Vec<String>> {
     };
     let rest = &line[start + "FLAGS (".len()..];
     let end = rest.find(')').ok_or_else(|| {
-        YacliError::Serialization(format!(
+        YamcliError::Serialization(format!(
             "unterminated FLAGS block in IMAP FETCH response: {line}"
         ))
     })?;
@@ -2178,7 +2179,7 @@ fn extract_trailing_literal_len(line: &str) -> Result<Option<usize>> {
 
     let digits = line[open + 1..line.len() - 1].trim();
     let value = digits.parse::<usize>().map_err(|err| {
-        YacliError::Serialization(format!(
+        YamcliError::Serialization(format!(
             "invalid literal size in IMAP FETCH response `{line}`: {err}"
         ))
     })?;
@@ -2219,7 +2220,7 @@ fn select_drafts_mailbox(folders: &[MailFolder]) -> Result<MailFolder> {
             return Ok(folder.clone());
         }
     }
-    Err(YacliError::Api(
+    Err(YamcliError::Api(
         "could not find a Drafts mailbox: the IMAP server advertises no \\Drafts folder and none of the known names exist".to_string(),
     ))
 }
@@ -2236,15 +2237,15 @@ fn parse_appenduid(tagged: &str) -> Option<u64> {
 fn parse_list_line(line: &str) -> Result<MailFolder> {
     let payload = line
         .strip_prefix("* LIST ")
-        .ok_or_else(|| YacliError::Serialization(format!("invalid IMAP LIST line: {line}")))?;
+        .ok_or_else(|| YamcliError::Serialization(format!("invalid IMAP LIST line: {line}")))?;
     let attrs_end = payload.find(')').ok_or_else(|| {
-        YacliError::Serialization(format!("invalid IMAP LIST attributes: {line}"))
+        YamcliError::Serialization(format!("invalid IMAP LIST attributes: {line}"))
     })?;
     let attrs_raw = payload
         .strip_prefix('(')
         .and_then(|value| value.get(..attrs_end.saturating_sub(1)))
         .ok_or_else(|| {
-            YacliError::Serialization(format!("invalid IMAP LIST attribute block: {line}"))
+            YamcliError::Serialization(format!("invalid IMAP LIST attribute block: {line}"))
         })?;
 
     let attributes = attrs_raw
@@ -2255,11 +2256,11 @@ fn parse_list_line(line: &str) -> Result<MailFolder> {
 
     let rest = payload
         .get(attrs_end + 1..)
-        .ok_or_else(|| YacliError::Serialization(format!("invalid IMAP LIST payload: {line}")))?;
+        .ok_or_else(|| YamcliError::Serialization(format!("invalid IMAP LIST payload: {line}")))?;
     let (delimiter, rest) = parse_imap_token(rest.trim_start())?;
     let (raw_name, _) = parse_imap_token(rest.trim_start())?;
     let raw_name = raw_name.ok_or_else(|| {
-        YacliError::Serialization(format!(
+        YamcliError::Serialization(format!(
             "IMAP LIST mailbox name is NIL, which is unsupported: {line}"
         ))
     })?;
@@ -2275,7 +2276,7 @@ fn parse_list_line(line: &str) -> Result<MailFolder> {
 fn parse_imap_token(input: &str) -> Result<(Option<String>, &str)> {
     let trimmed = input.trim_start();
     if trimmed.is_empty() {
-        return Err(YacliError::Serialization(
+        return Err(YamcliError::Serialization(
             "unexpected end of IMAP token stream".to_string(),
         ));
     }
@@ -2301,7 +2302,7 @@ fn parse_imap_token(input: &str) -> Result<(Option<String>, &str)> {
             }
         }
 
-        return Err(YacliError::Serialization(
+        return Err(YamcliError::Serialization(
             "unterminated IMAP quoted string".to_string(),
         ));
     }
@@ -2343,10 +2344,10 @@ fn decode_modified_utf7(raw_name: &str) -> Result<String> {
         }
 
         let bytes = STANDARD.decode(base64.as_bytes()).map_err(|err| {
-            YacliError::Serialization(format!("invalid modified UTF-7 folder name: {err}"))
+            YamcliError::Serialization(format!("invalid modified UTF-7 folder name: {err}"))
         })?;
         if bytes.len() % 2 != 0 {
-            return Err(YacliError::Serialization(
+            return Err(YamcliError::Serialization(
                 "modified UTF-7 folder name is not valid UTF-16BE".to_string(),
             ));
         }
@@ -2356,7 +2357,7 @@ fn decode_modified_utf7(raw_name: &str) -> Result<String> {
             .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
             .collect::<Vec<_>>();
         let text = String::from_utf16(&utf16).map_err(|err| {
-            YacliError::Serialization(format!(
+            YamcliError::Serialization(format!(
                 "invalid UTF-16 in modified UTF-7 folder name: {err}"
             ))
         })?;
@@ -2409,32 +2410,32 @@ fn normalize_recipient_list(values: Vec<String>, flag_name: &str) -> Result<Vec<
 fn normalize_recipient(value: &str, flag_name: &str) -> Result<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{flag_name} must not contain empty recipients"
         )));
     }
     if trimmed.contains(['\r', '\n']) {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{flag_name} recipient must not contain CR or LF characters"
         )));
     }
     if trimmed.contains(',') {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{flag_name} accepts one email address per flag; repeat the flag for multiple recipients"
         )));
     }
     if !trimmed.is_ascii() {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{flag_name} recipient must be ASCII-only email address"
         )));
     }
     if trimmed.contains(char::is_whitespace) {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{flag_name} recipient must not contain whitespace"
         )));
     }
     if !trimmed.contains('@') {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{flag_name} recipient must contain `@`"
         )));
     }
@@ -2444,12 +2445,12 @@ fn normalize_recipient(value: &str, flag_name: &str) -> Result<String> {
 fn normalize_subject(subject: String) -> Result<String> {
     let trimmed = subject.trim();
     if trimmed.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail send subject must not be empty".to_string(),
         ));
     }
     if trimmed.contains(['\r', '\n']) {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail send subject must not contain CR or LF characters".to_string(),
         ));
     }
@@ -2461,12 +2462,12 @@ fn normalize_optional_body(body: Option<String>, flag_name: &str) -> Result<Opti
         return Ok(None);
     };
     if body.contains('\0') {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{flag_name} must not contain NUL characters"
         )));
     }
     if body.is_empty() {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{flag_name} must not be empty"
         )));
     }
@@ -2485,7 +2486,7 @@ fn normalize_outgoing_body(
         (true, false) => "text",
         (false, true) => "html",
         (false, false) => {
-            return Err(YacliError::Validation(format!(
+            return Err(YamcliError::Validation(format!(
                 "{command_name} requires text or --html"
             )));
         }
@@ -2534,7 +2535,7 @@ fn build_outgoing_message(outgoing: OutgoingMessage<'_>) -> Result<String> {
     let body = if outgoing.attachments.is_empty() {
         build_root_body(&mut headers, outgoing.text, outgoing.html)?
     } else {
-        let boundary = format!("yacli-mix-{:016x}", random::<u64>());
+        let boundary = format!("yamcli-mix-{:016x}", random::<u64>());
         headers.push(format!(
             "Content-Type: multipart/mixed; boundary=\"{boundary}\""
         ));
@@ -2559,7 +2560,7 @@ fn build_root_body(
 ) -> Result<String> {
     match (text, html) {
         (Some(text), Some(html)) => {
-            let boundary = format!("yacli-alt-{:016x}", random::<u64>());
+            let boundary = format!("yamcli-alt-{:016x}", random::<u64>());
             headers.push(format!(
                 "Content-Type: multipart/alternative; boundary=\"{boundary}\""
             ));
@@ -2575,7 +2576,7 @@ fn build_root_body(
             headers.push("Content-Transfer-Encoding: base64".to_string());
             Ok(encode_bytes_base64(html.as_bytes()))
         }
-        (None, None) => Err(YacliError::Validation(
+        (None, None) => Err(YamcliError::Validation(
             "mail send requires text or --html".to_string(),
         )),
     }
@@ -2619,7 +2620,7 @@ fn build_multipart_mixed_body(
 fn build_primary_body_part(text: Option<&str>, html: Option<&str>) -> Result<Vec<String>> {
     match (text, html) {
         (Some(text), Some(html)) => {
-            let boundary = format!("yacli-alt-{:016x}", random::<u64>());
+            let boundary = format!("yamcli-alt-{:016x}", random::<u64>());
             Ok(vec![
                 format!("Content-Type: multipart/alternative; boundary=\"{boundary}\""),
                 String::new(),
@@ -2638,7 +2639,7 @@ fn build_primary_body_part(text: Option<&str>, html: Option<&str>) -> Result<Vec
             String::new(),
             encode_bytes_base64(html.as_bytes()),
         ]),
-        (None, None) => Err(YacliError::Validation(
+        (None, None) => Err(YamcliError::Validation(
             "mail send requires text or --html".to_string(),
         )),
     }
@@ -2690,7 +2691,7 @@ fn sanitize_mime_type(value: &str) -> Result<String> {
         return Ok("application/octet-stream".to_string());
     }
     if trimmed.contains(['\r', '\n']) {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail attachment MIME type must not contain CR or LF characters".to_string(),
         ));
     }
@@ -2707,7 +2708,7 @@ fn normalize_content_id_header(value: &str) -> Result<String> {
 
 fn build_mime_parameter(name: &str, value: &str) -> Result<String> {
     if value.contains(['\r', '\n']) {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{name} MIME parameter must not contain CR or LF characters"
         )));
     }
@@ -2761,7 +2762,7 @@ fn wrap_base64(value: &str, width: usize) -> String {
 
 fn encode_header_value(value: &str) -> Result<String> {
     if value.contains(['\r', '\n']) {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "mail send headers must not contain CR or LF characters".to_string(),
         ));
     }
@@ -2773,12 +2774,12 @@ fn encode_header_value(value: &str) -> Result<String> {
 
 fn sanitize_header_ascii(value: &str, header_name: &str) -> Result<String> {
     if value.contains(['\r', '\n']) {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{header_name} header must not contain CR or LF characters"
         )));
     }
     if !value.is_ascii() {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{header_name} header must be ASCII-only in mail send core"
         )));
     }
@@ -2787,7 +2788,7 @@ fn sanitize_header_ascii(value: &str, header_name: &str) -> Result<String> {
 
 fn generate_message_id() -> String {
     format!(
-        "yacli-{}-{:016x}@nextstat.dev",
+        "yamcli-{}-{:016x}@onega.io",
         Utc::now().timestamp_micros(),
         random::<u64>()
     )
@@ -2831,26 +2832,26 @@ fn validate_mail_attachment_read_request(
     command_name: &str,
 ) -> Result<()> {
     if uid == 0 {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{command_name} <id> must be greater than zero"
         )));
     }
     if max_bytes == 0 {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{command_name} --max-bytes must be greater than zero"
         )));
     }
     match selector {
         MailAttachmentSelector::Index(index) => {
             if *index == 0 {
-                return Err(YacliError::Validation(format!(
+                return Err(YamcliError::Validation(format!(
                     "{command_name} --index must be greater than zero"
                 )));
             }
         }
         MailAttachmentSelector::Filename(filename) => {
             if filename.trim().is_empty() {
-                return Err(YacliError::Validation(format!(
+                return Err(YamcliError::Validation(format!(
                     "{command_name} --name must not be empty"
                 )));
             }
@@ -2862,13 +2863,13 @@ fn validate_mail_attachment_read_request(
 
 fn load_mail_attachment(path: &Path) -> Result<MailAttachmentPayload> {
     let metadata = fs::metadata(path).map_err(|err| {
-        YacliError::Io(format!(
+        YamcliError::Io(format!(
             "unable to read attachment metadata {}: {err}",
             path.display()
         ))
     })?;
     if metadata.is_dir() {
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "attachment path points to a directory: {}",
             path.display()
         )));
@@ -2878,14 +2879,14 @@ fn load_mail_attachment(path: &Path) -> Result<MailAttachmentPayload> {
         .file_name()
         .and_then(|value| value.to_str())
         .ok_or_else(|| {
-            YacliError::Validation(format!(
+            YamcliError::Validation(format!(
                 "attachment path must end with a valid UTF-8 filename: {}",
                 path.display()
             ))
         })?;
 
     let content = fs::read(path).map_err(|err| {
-        YacliError::Io(format!(
+        YamcliError::Io(format!(
             "unable to read attachment file {}: {err}",
             path.display()
         ))
@@ -2942,18 +2943,18 @@ fn inspect_invite_from_message(
             .map(|name| name.to_ascii_lowercase().ends_with(".ics"))
             .unwrap_or(false);
     if !is_calendar_payload {
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "selected attachment is not a calendar invite: mime_type={}",
             attachment.mime_type
         )));
     }
 
     let raw = std::str::from_utf8(&attachment.content).map_err(|err| {
-        YacliError::Serialization(format!("failed to decode calendar invite as UTF-8: {err}"))
+        YamcliError::Serialization(format!("failed to decode calendar invite as UTF-8: {err}"))
     })?;
     let invites = parse_calendar_invites(raw)?;
     if invites.is_empty() {
-        return Err(YacliError::UnsupportedOperation(
+        return Err(YamcliError::UnsupportedOperation(
             "calendar invite did not contain any VEVENT entries".to_string(),
         ));
     }
@@ -2974,7 +2975,7 @@ fn select_attachment_part<'a>(
     selector: &MailAttachmentSelector,
 ) -> Result<(usize, &'a MailAttachmentPart)> {
     if message.raw_attachments.is_empty() {
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "message id {} has no attachments",
             message.uid
         )));
@@ -2986,7 +2987,7 @@ fn select_attachment_part<'a>(
             .get(index - 1)
             .map(|attachment| (*index, attachment))
             .ok_or_else(|| {
-                YacliError::Validation(format!(
+                YamcliError::Validation(format!(
                     "mail attachment export attachment index {} out of range; message has {} attachment(s)",
                     index,
                     message.raw_attachments.len()
@@ -3001,14 +3002,14 @@ fn select_attachment_part<'a>(
                 .filter(|(_, attachment)| attachment.filename.as_deref() == Some(normalized));
 
             let Some((first_index, first_attachment)) = matches.next() else {
-                return Err(YacliError::Validation(format!(
+                return Err(YamcliError::Validation(format!(
                     "mail attachment export attachment not found: {}",
                     normalized
                 )));
             };
 
             if matches.next().is_some() {
-                return Err(YacliError::UnsupportedOperation(format!(
+                return Err(YamcliError::UnsupportedOperation(format!(
                     "mail attachment export attachment name `{}` is ambiguous; use --index",
                     normalized
                 )));
@@ -3021,11 +3022,11 @@ fn select_attachment_part<'a>(
 
 fn write_attachment_to_path(contents: &[u8], output: &Path, force: bool) -> Result<ExportedBytes> {
     if output.exists() && !force {
-        return Err(YacliError::OutputExists(output.display().to_string()));
+        return Err(YamcliError::OutputExists(output.display().to_string()));
     }
 
     if output.is_dir() {
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "output path points to a directory: {}",
             output.display()
         )));
@@ -3049,7 +3050,7 @@ fn write_attachment_to_path(contents: &[u8], output: &Path, force: bool) -> Resu
 
     temp_file
         .persist(output)
-        .map_err(|err| YacliError::Io(err.error.to_string()))?;
+        .map_err(|err| YamcliError::Io(err.error.to_string()))?;
 
     let mut hasher = Sha256::new();
     hasher.update(contents);
@@ -3364,7 +3365,7 @@ mod tests {
             text: Some("Body"),
             html: None,
             attachments: &[],
-            message_id: "msg-2@nextstat.dev",
+            message_id: "msg-2@onega.io",
             thread_headers: Some(&MailThreadHeaders {
                 in_reply_to: "<parent@example>".to_string(),
                 references: vec!["<root@example>".to_string(), "<parent@example>".to_string()],
@@ -3386,14 +3387,14 @@ mod tests {
             text: Some("Привет"),
             html: None,
             attachments: &[],
-            message_id: "msg-1@nextstat.dev",
+            message_id: "msg-1@onega.io",
             thread_headers: None,
         })
         .expect("message");
 
         assert!(message.contains("Content-Type: text/plain; charset=UTF-8"));
         assert!(message.contains("Content-Transfer-Encoding: base64"));
-        assert!(message.contains("Message-ID: <msg-1@nextstat.dev>"));
+        assert!(message.contains("Message-ID: <msg-1@onega.io>"));
         assert!(message.contains(&STANDARD.encode("Привет".as_bytes())));
     }
 
@@ -3405,7 +3406,7 @@ mod tests {
         let observer = fake.clone();
         let mut session = SmtpSession::from_stream(fake);
         session.read_greeting("smtp.yandex.com").expect("greeting");
-        session.ehlo("yacli.test").expect("ehlo");
+        session.ehlo("yamcli.test").expect("ehlo");
         session
             .authenticate_xoauth2("me@yandex.ru", "token-123")
             .expect("auth");
@@ -3419,7 +3420,7 @@ mod tests {
         session.quit().expect("quit");
 
         let writes = observer.written();
-        assert!(writes.contains("EHLO yacli.test\r\n"));
+        assert!(writes.contains("EHLO yamcli.test\r\n"));
         assert!(writes.contains("AUTH XOAUTH2 "));
         assert!(writes.contains("MAIL FROM:<me@yandex.ru>\r\n"));
         assert!(writes.contains("RCPT TO:<person@example.com>\r\n"));

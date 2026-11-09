@@ -18,7 +18,7 @@ pub struct WorkflowDefinition {
 }
 
 const DAILY_BRIEFING_CLI_STEPS: &[&str] = &["mail list --limit 10", "calendar events"];
-const DAILY_BRIEFING_TOOLS: &[&str] = &["yacli.mail.list", "yacli.calendar.events"];
+const DAILY_BRIEFING_TOOLS: &[&str] = &["yamcli.mail.list", "yamcli.calendar.events"];
 
 const REPLY_WITH_CONTEXT_CLI_STEPS: &[&str] = &[
     "mail read 1353",
@@ -26,32 +26,32 @@ const REPLY_WITH_CONTEXT_CLI_STEPS: &[&str] = &[
     "mail reply 1353 \"Подтверждаю, это окно подходит\"",
 ];
 const REPLY_WITH_CONTEXT_TOOLS: &[&str] = &[
-    "yacli.mail.read",
-    "yacli.calendar.events",
-    "yacli.mail.reply",
+    "yamcli.mail.read",
+    "yamcli.calendar.events",
+    "yamcli.mail.reply",
 ];
 
 const ATTACHMENT_TO_DISK_CLI_STEPS: &[&str] = &[
     "mail search \"invoice\"",
     "mail attachment export 1353 --name invoice.pdf --output ./invoice.pdf",
 ];
-const ATTACHMENT_TO_DISK_TOOLS: &[&str] = &["yacli.mail.search", "yacli.mail.attachment.export"];
+const ATTACHMENT_TO_DISK_TOOLS: &[&str] = &["yamcli.mail.search", "yamcli.mail.attachment.export"];
 
 const SEND_FILE_BY_MAIL_CLI_STEPS: &[&str] =
     &["mail send person@example.com \"Счёт\" \"Во вложении файл\" --attach ./invoice.pdf"];
-const SEND_FILE_BY_MAIL_TOOLS: &[&str] = &["yacli.mail.send"];
+const SEND_FILE_BY_MAIL_TOOLS: &[&str] = &["yamcli.mail.send"];
 
 const SEND_LINK_BY_MAIL_CLI_STEPS: &[&str] = &[
     "mail send-link person@example.com \"Материалы\" \"Отправляю ссылку\" --source ./archive.zip --path disk:/docs/archive/archive.zip",
 ];
-const SEND_LINK_BY_MAIL_TOOLS: &[&str] = &["yacli.mail.send_link"];
+const SEND_LINK_BY_MAIL_TOOLS: &[&str] = &["yamcli.mail.send_link"];
 
 const PUBLISH_FILE_LINK_CLI_STEPS: &[&str] =
     &["disk upload-link --source ./archive.zip --path disk:/docs/archive/archive.zip"];
-const PUBLISH_FILE_LINK_TOOLS: &[&str] = &["yacli.disk.upload_link"];
+const PUBLISH_FILE_LINK_TOOLS: &[&str] = &["yamcli.disk.upload_link"];
 
 const REVOKE_PUBLIC_LINK_CLI_STEPS: &[&str] = &["disk unpublish disk:/docs/archive/archive.zip"];
-const REVOKE_PUBLIC_LINK_TOOLS: &[&str] = &["yacli.disk.unpublish"];
+const REVOKE_PUBLIC_LINK_TOOLS: &[&str] = &["yamcli.disk.unpublish"];
 
 const INVITE_TO_CALENDAR_CLI_STEPS: &[&str] = &[
     "mail search \"приглашение\"",
@@ -59,9 +59,9 @@ const INVITE_TO_CALENDAR_CLI_STEPS: &[&str] = &[
     "mail invite create-event 1353 --index 1 --calendar team",
 ];
 const INVITE_TO_CALENDAR_TOOLS: &[&str] = &[
-    "yacli.mail.search",
-    "yacli.mail.invite.inspect",
-    "yacli.mail.invite.create_event",
+    "yamcli.mail.search",
+    "yamcli.mail.invite.inspect",
+    "yamcli.mail.invite.create_event",
 ];
 
 const WORKFLOWS: &[WorkflowDefinition] = &[
@@ -72,7 +72,7 @@ const WORKFLOWS: &[WorkflowDefinition] = &[
         connects: "Почта + календарь",
         request_example: "Собери утреннюю сводку по письмам и встречам",
         prompt_name: "daily-briefing",
-        skill_name: "yacli-daily-briefing",
+        skill_name: "yamcli-daily-briefing",
         cli_steps: DAILY_BRIEFING_CLI_STEPS,
         mcp_tools: DAILY_BRIEFING_TOOLS,
     },
@@ -83,7 +83,7 @@ const WORKFLOWS: &[WorkflowDefinition] = &[
         connects: "Почта + календарь",
         request_example: "Ответь на письмо с учётом моего расписания",
         prompt_name: "reply-with-context",
-        skill_name: "yacli-reply-with-context",
+        skill_name: "yamcli-reply-with-context",
         cli_steps: REPLY_WITH_CONTEXT_CLI_STEPS,
         mcp_tools: REPLY_WITH_CONTEXT_TOOLS,
     },
@@ -94,7 +94,7 @@ const WORKFLOWS: &[WorkflowDefinition] = &[
         connects: "Почта → файл",
         request_example: "Найди письмо и сохрани вложение в файл",
         prompt_name: "attachment-to-disk",
-        skill_name: "yacli-attachment-to-disk",
+        skill_name: "yamcli-attachment-to-disk",
         cli_steps: ATTACHMENT_TO_DISK_CLI_STEPS,
         mcp_tools: ATTACHMENT_TO_DISK_TOOLS,
     },
@@ -105,7 +105,7 @@ const WORKFLOWS: &[WorkflowDefinition] = &[
         connects: "Файл → почта",
         request_example: "Отправь файл с диска по почте",
         prompt_name: "send-file-by-mail",
-        skill_name: "yacli-send-file-by-mail",
+        skill_name: "yamcli-send-file-by-mail",
         cli_steps: SEND_FILE_BY_MAIL_CLI_STEPS,
         mcp_tools: SEND_FILE_BY_MAIL_TOOLS,
     },
@@ -116,7 +116,7 @@ const WORKFLOWS: &[WorkflowDefinition] = &[
         connects: "Файл → Диск → почта",
         request_example: "Загрузи большой файл на Диск и отправь ссылку по почте",
         prompt_name: "send-link-by-mail",
-        skill_name: "yacli-send-link-by-mail",
+        skill_name: "yamcli-send-link-by-mail",
         cli_steps: SEND_LINK_BY_MAIL_CLI_STEPS,
         mcp_tools: SEND_LINK_BY_MAIL_TOOLS,
     },
@@ -127,7 +127,7 @@ const WORKFLOWS: &[WorkflowDefinition] = &[
         connects: "Файл → Диск",
         request_example: "Загрузи файл на Диск и дай публичную ссылку",
         prompt_name: "publish-file-link",
-        skill_name: "yacli-publish-file-link",
+        skill_name: "yamcli-publish-file-link",
         cli_steps: PUBLISH_FILE_LINK_CLI_STEPS,
         mcp_tools: PUBLISH_FILE_LINK_TOOLS,
     },
@@ -138,7 +138,7 @@ const WORKFLOWS: &[WorkflowDefinition] = &[
         connects: "Диск",
         request_example: "Отзови публичную ссылку у файла на Диске",
         prompt_name: "revoke-public-link",
-        skill_name: "yacli-revoke-public-link",
+        skill_name: "yamcli-revoke-public-link",
         cli_steps: REVOKE_PUBLIC_LINK_CLI_STEPS,
         mcp_tools: REVOKE_PUBLIC_LINK_TOOLS,
     },
@@ -149,7 +149,7 @@ const WORKFLOWS: &[WorkflowDefinition] = &[
         connects: "Почта → календарь",
         request_example: "Найди приглашение и добавь встречу в календарь",
         prompt_name: "invite-to-calendar",
-        skill_name: "yacli-invite-to-calendar",
+        skill_name: "yamcli-invite-to-calendar",
         cli_steps: INVITE_TO_CALENDAR_CLI_STEPS,
         mcp_tools: INVITE_TO_CALENDAR_TOOLS,
     },
@@ -165,28 +165,28 @@ pub fn workflow_definition(id: &str) -> Option<&'static WorkflowDefinition> {
 
 pub fn workflow_primary_tool(id: &str) -> Option<&'static str> {
     match id {
-        "daily-briefing" => Some("yacli.mail.list"),
-        "reply-with-context" => Some("yacli.mail.reply"),
-        "attachment-to-disk" => Some("yacli.mail.attachment.export"),
-        "send-file-by-mail" => Some("yacli.mail.send"),
-        "send-link-by-mail" => Some("yacli.mail.send_link"),
-        "publish-file-link" => Some("yacli.disk.upload_link"),
-        "revoke-public-link" => Some("yacli.disk.unpublish"),
-        "invite-to-calendar" => Some("yacli.mail.invite.create_event"),
+        "daily-briefing" => Some("yamcli.mail.list"),
+        "reply-with-context" => Some("yamcli.mail.reply"),
+        "attachment-to-disk" => Some("yamcli.mail.attachment.export"),
+        "send-file-by-mail" => Some("yamcli.mail.send"),
+        "send-link-by-mail" => Some("yamcli.mail.send_link"),
+        "publish-file-link" => Some("yamcli.disk.upload_link"),
+        "revoke-public-link" => Some("yamcli.disk.unpublish"),
+        "invite-to-calendar" => Some("yamcli.mail.invite.create_event"),
         _ => workflow_definition(id).and_then(|definition| definition.mcp_tools.first().copied()),
     }
 }
 
 pub fn workflow_primary_operation(id: &str) -> &'static str {
     match workflow_primary_tool(id) {
-        Some("yacli.mail.list") => "mail.list",
-        Some("yacli.mail.reply") => "mail.reply",
-        Some("yacli.mail.attachment.export") => "mail.attachment.export",
-        Some("yacli.mail.send") => "mail.send",
-        Some("yacli.mail.send_link") => "mail.send_link",
-        Some("yacli.disk.upload_link") => "disk.upload_link",
-        Some("yacli.disk.unpublish") => "disk.unpublish",
-        Some("yacli.mail.invite.create_event") => "mail.invite.create_event",
+        Some("yamcli.mail.list") => "mail.list",
+        Some("yamcli.mail.reply") => "mail.reply",
+        Some("yamcli.mail.attachment.export") => "mail.attachment.export",
+        Some("yamcli.mail.send") => "mail.send",
+        Some("yamcli.mail.send_link") => "mail.send_link",
+        Some("yamcli.disk.upload_link") => "disk.upload_link",
+        Some("yamcli.disk.unpublish") => "disk.unpublish",
+        Some("yamcli.mail.invite.create_event") => "mail.invite.create_event",
         _ => "",
     }
 }
@@ -195,10 +195,10 @@ pub fn workflow_supports_review(id: &str) -> bool {
     matches!(
         workflow_primary_tool(id),
         Some(
-            "yacli.mail.send"
-                | "yacli.mail.send_link"
-                | "yacli.disk.upload_link"
-                | "yacli.disk.unpublish"
+            "yamcli.mail.send"
+                | "yamcli.mail.send_link"
+                | "yamcli.disk.upload_link"
+                | "yamcli.disk.unpublish"
         )
     )
 }
@@ -290,7 +290,7 @@ pub fn workflow_json(definition: &WorkflowDefinition) -> Value {
         "primary_tool_arguments": workflow_primary_tool_arguments(definition.id),
         "cli_steps": definition.cli_steps,
         "mcp_tools": definition.mcp_tools,
-        "prompt_resource": format!("resource://yacli/skill/{}", definition.skill_name),
+        "prompt_resource": format!("resource://yamcli/skill/{}", definition.skill_name),
     })
 }
 
@@ -542,11 +542,11 @@ fn workflow_review_action(id: &str) -> Value {
 fn workflow_resume_action(id: &str, entry: &ActivityEntry) -> Option<Value> {
     let (tool_name, mut tool_arguments) = match id {
         "send-link-by-mail" => (
-            "yacli.mail.send_published_link",
+            "yamcli.mail.send_published_link",
             parse_send_published_link_replay(&entry.replay_command)?,
         ),
         "invite-to-calendar" => (
-            "yacli.calendar.create",
+            "yamcli.calendar.create",
             parse_calendar_create_replay(&entry.replay_command)?,
         ),
         _ => return None,
@@ -573,7 +573,7 @@ fn workflow_resume_action(id: &str, entry: &ActivityEntry) -> Option<Value> {
 fn parse_send_published_link_replay(command: &str) -> Option<Value> {
     let tokens = parse_shell_words(command)?;
     if tokens.len() < 5
-        || tokens[0] != "yacli"
+        || tokens[0] != "yamcli"
         || tokens[1] != "mail"
         || tokens[2] != "send-published-link"
     {
@@ -625,7 +625,7 @@ fn parse_send_published_link_replay(command: &str) -> Option<Value> {
 
 fn parse_calendar_create_replay(command: &str) -> Option<Value> {
     let tokens = parse_shell_words(command)?;
-    if tokens.len() < 6 || tokens[0] != "yacli" || tokens[1] != "calendar" || tokens[2] != "create"
+    if tokens.len() < 6 || tokens[0] != "yamcli" || tokens[1] != "calendar" || tokens[2] != "create"
     {
         return None;
     }
@@ -751,7 +751,7 @@ fn workflow_activity_is_undo(id: &str, entry: &ActivityEntry) -> bool {
     }
 
     match id {
-        "publish-file-link" => entry.replay_command.starts_with("yacli disk unpublish "),
+        "publish-file-link" => entry.replay_command.starts_with("yamcli disk unpublish "),
         _ => false,
     }
 }
@@ -800,15 +800,15 @@ mod tests {
     fn workflow_detail_exposes_prompt_and_skill_links() {
         let detail = workflow_resource_detail("invite-to-calendar").expect("detail");
         assert_eq!(detail["prompt_name"], "invite-to-calendar");
-        assert_eq!(detail["skill_name"], "yacli-invite-to-calendar");
-        assert_eq!(detail["primary_tool"], "yacli.mail.invite.create_event");
+        assert_eq!(detail["skill_name"], "yamcli-invite-to-calendar");
+        assert_eq!(detail["primary_tool"], "yamcli.mail.invite.create_event");
         assert_eq!(detail["primary_operation"], "mail.invite.create_event");
         assert_eq!(detail["supports_review"], false);
         assert_eq!(detail["primary_tool_arguments"]["folder"], "INBOX");
         assert_eq!(detail["primary_tool_arguments"]["calendar"], "team");
         assert_eq!(
             detail["prompt_resource"],
-            "resource://yacli/skill/yacli-invite-to-calendar"
+            "resource://yamcli/skill/yamcli-invite-to-calendar"
         );
     }
 
@@ -816,11 +816,11 @@ mod tests {
     fn workflow_primary_tool_prefers_actionable_tool_over_first_catalog_entry() {
         assert_eq!(
             workflow_primary_tool("invite-to-calendar"),
-            Some("yacli.mail.invite.create_event")
+            Some("yamcli.mail.invite.create_event")
         );
         assert_eq!(
             workflow_primary_tool("reply-with-context"),
-            Some("yacli.mail.reply")
+            Some("yamcli.mail.reply")
         );
     }
 
@@ -858,9 +858,9 @@ mod tests {
             operation: "mail.send_link.partial".to_string(),
             account: "mock".to_string(),
             summary: "Публичная ссылка создана, но письмо не отправлено".to_string(),
-            replay_command: "yacli mail send-published-link person@example.com 'Материалы' --public-url https://disk.example/public".to_string(),
+            replay_command: "yamcli mail send-published-link person@example.com 'Материалы' --public-url https://disk.example/public".to_string(),
             undo: None,
-            undo_command: Some("yacli disk unpublish disk:/docs/archive.zip".to_string()),
+            undo_command: Some("yamcli disk unpublish disk:/docs/archive.zip".to_string()),
         }];
 
         let payload = workflow_execution_payload("send-link-by-mail", &doctor, &entries);
@@ -870,7 +870,7 @@ mod tests {
         assert_eq!(payload["actions"][0]["kind"], "review_tool");
         assert_eq!(
             payload["actions"][0]["tool_name"],
-            "yacli.mail.send_published_link"
+            "yamcli.mail.send_published_link"
         );
         assert_eq!(
             payload["actions"][0]["tool_arguments"]["public_url"],
@@ -900,7 +900,7 @@ mod tests {
             operation: "activity.undo".to_string(),
             account: "mock".to_string(),
             summary: "Откат действия act_publish: отозвана публичная ссылка".to_string(),
-            replay_command: "yacli disk unpublish disk:/docs/archive.zip".to_string(),
+            replay_command: "yamcli disk unpublish disk:/docs/archive.zip".to_string(),
             undo: None,
             undo_command: None,
         }];
@@ -942,7 +942,7 @@ mod tests {
         assert_eq!(payload["next_action"], "review");
         assert_eq!(payload["available_actions"][0], "review");
         assert_eq!(payload["actions"][0]["kind"], "review_tool");
-        assert_eq!(payload["actions"][0]["tool_name"], "yacli.mail.send_link");
+        assert_eq!(payload["actions"][0]["tool_name"], "yamcli.mail.send_link");
     }
 
     #[test]
@@ -962,10 +962,10 @@ mod tests {
             account: "mock".to_string(),
             summary: "Файл загружен и опубликован".to_string(),
             replay_command:
-                "yacli disk upload-link --source ./archive.zip --path disk:/docs/archive.zip"
+                "yamcli disk upload-link --source ./archive.zip --path disk:/docs/archive.zip"
                     .to_string(),
             undo: None,
-            undo_command: Some("yacli disk unpublish disk:/docs/archive.zip".to_string()),
+            undo_command: Some("yamcli disk unpublish disk:/docs/archive.zip".to_string()),
         }];
 
         let payload = workflow_execution_payload("publish-file-link", &doctor, &entries);
@@ -978,7 +978,7 @@ mod tests {
     #[test]
     fn parse_shell_words_supports_single_quoted_segments() {
         let words = parse_shell_words(
-            "yacli mail send-published-link person@example.com 'Материалы ревью' 'Текст письма' --public-url 'https://disk.yandex.ru/i/report'",
+            "yamcli mail send-published-link person@example.com 'Материалы ревью' 'Текст письма' --public-url 'https://disk.yandex.ru/i/report'",
         )
         .expect("words");
         assert_eq!(words[4], "Материалы ревью");

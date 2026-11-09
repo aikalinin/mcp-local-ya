@@ -3,7 +3,7 @@ use std::process;
 use serde_json::json;
 
 #[derive(Debug, thiserror::Error)]
-pub enum YacliError {
+pub enum YamcliError {
     #[error("Account already exists: {0}")]
     AccountExists(String),
 
@@ -44,7 +44,7 @@ pub enum YacliError {
     Integrity(String),
 }
 
-impl YacliError {
+impl YamcliError {
     pub fn exit_code(&self) -> i32 {
         match self {
             Self::AccountExists(_)
@@ -91,28 +91,28 @@ impl YacliError {
     }
 }
 
-impl From<std::io::Error> for YacliError {
+impl From<std::io::Error> for YamcliError {
     fn from(value: std::io::Error) -> Self {
         Self::Io(value.to_string())
     }
 }
 
-impl From<toml::de::Error> for YacliError {
+impl From<toml::de::Error> for YamcliError {
     fn from(value: toml::de::Error) -> Self {
         Self::Serialization(value.to_string())
     }
 }
 
-impl From<toml::ser::Error> for YacliError {
+impl From<toml::ser::Error> for YamcliError {
     fn from(value: toml::ser::Error) -> Self {
         Self::Serialization(value.to_string())
     }
 }
 
-impl From<reqwest::Error> for YacliError {
+impl From<reqwest::Error> for YamcliError {
     fn from(value: reqwest::Error) -> Self {
         Self::Network(value.to_string())
     }
 }
 
-pub type Result<T> = std::result::Result<T, YacliError>;
+pub type Result<T> = std::result::Result<T, YamcliError>;

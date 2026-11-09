@@ -1,6 +1,6 @@
 //! Outgoing-mail policy for MCP tools.
 //!
-//! An AI agent driving `yacli.mail.send` / `reply` / `forward` / `send_link` /
+//! An AI agent driving `yamcli.mail.send` / `reply` / `forward` / `send_link` /
 //! `send_published_link` can be steered by untrusted content it just read (a
 //! malicious e-mail, a document on Disk). The server therefore decides how an
 //! outgoing message leaves the account instead of trusting the agent:
@@ -14,20 +14,20 @@
 //!   requests (stdio). Otherwise it degrades to `draft`, never to `send`.
 //! - `send`: submit over SMTP immediately (pre-hardening behaviour).
 //!
-//! The CLI is unaffected: a human typing `yacli mail send` already decided.
+//! The CLI is unaffected: a human typing `yamcli mail send` already decided.
 
 use std::env;
 
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 
-pub const SEND_POLICY_ENV: &str = "YACLI_MCP_SEND_POLICY";
+pub const SEND_POLICY_ENV: &str = "YAMCLI_MCP_SEND_POLICY";
 
 pub const MAIL_SENDING_TOOLS: &[&str] = &[
-    "yacli.mail.send",
-    "yacli.mail.reply",
-    "yacli.mail.forward",
-    "yacli.mail.send_link",
-    "yacli.mail.send_published_link",
+    "yamcli.mail.send",
+    "yamcli.mail.reply",
+    "yamcli.mail.forward",
+    "yamcli.mail.send_link",
+    "yamcli.mail.send_published_link",
 ];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -61,7 +61,7 @@ pub fn configured_send_policy() -> Result<SendPolicy> {
         Err(_) => Ok(SendPolicy::Draft),
         Ok(raw) if raw.trim().is_empty() => Ok(SendPolicy::Draft),
         Ok(raw) => SendPolicy::parse(&raw).ok_or_else(|| {
-            YacliError::Config(format!(
+            YamcliError::Config(format!(
                 "unsupported {SEND_POLICY_ENV} `{raw}`; expected `draft`, `confirm` or `send`"
             ))
         }),
@@ -87,15 +87,15 @@ mod tests {
     #[test]
     fn recognises_every_tool_that_can_send_mail() {
         for tool in [
-            "yacli.mail.send",
-            "yacli.mail.reply",
-            "yacli.mail.forward",
-            "yacli.mail.send_link",
-            "yacli.mail.send_published_link",
+            "yamcli.mail.send",
+            "yamcli.mail.reply",
+            "yamcli.mail.forward",
+            "yamcli.mail.send_link",
+            "yamcli.mail.send_published_link",
         ] {
             assert!(is_mail_sending_tool(tool), "{tool}");
         }
-        assert!(!is_mail_sending_tool("yacli.mail.read"));
-        assert!(!is_mail_sending_tool("yacli.disk.publish"));
+        assert!(!is_mail_sending_tool("yamcli.mail.read"));
+        assert!(!is_mail_sending_tool("yamcli.disk.publish"));
     }
 }

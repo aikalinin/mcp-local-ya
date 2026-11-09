@@ -6,7 +6,7 @@ use crate::disk::{
     DiskResource, DiskUploadReview, PrivateDiskPublishRequest, PrivateDiskUploadRequest,
     UploadedFile, publish_private_resource, review_private_upload, upload_private_resource,
 };
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 
 const PUBLIC_LINK_PLACEHOLDER: &str = "<публичная ссылка на файл>";
 
@@ -67,7 +67,7 @@ pub fn upload_link_to_disk(
     )?;
 
     if resource.public_url.is_none() && resource.public_key.is_none() {
-        return Err(YacliError::Api(format!(
+        return Err(YamcliError::Api(format!(
             "Yandex Disk did not return public_url/public_key after publishing `{}`",
             resource.path
         )));

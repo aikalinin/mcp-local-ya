@@ -1,8 +1,8 @@
 ---
-name: yacli-revoke-public-link
+name: yamcli-revoke-public-link
 description: "Отозвать публичную ссылку у файла или папки на Яндекс Диске: найти нужный путь `disk:/...`, снять `public_url` / `public_key` и явно показать пользователю, какая ссылка была отозвана."
 metadata:
-  author: NextStat
+  author: aikalinin (based on NextStat/yacli)
 ---
 
 # Отозвать публичную ссылку на Диске
@@ -16,17 +16,17 @@ metadata:
 2. Если путь неочевиден, сначала помоги найти его через:
 
 ```bash
-yacli disk list disk:/docs --limit 50
+yamcli disk list disk:/docs --limit 50
 ```
 
 3. Когда путь известен, отзови ссылку одной командой:
 
 ```bash
-yacli disk unpublish disk:/docs/archive/archive.zip
+yamcli disk unpublish disk:/docs/archive/archive.zip
 ```
 
 ## Заметки
 
 - В финальном ответе всегда явно покажи, какая `public_url` или `public_key` были сняты.
 - Если ресурс уже не был публичным, не выдавай это за новый revoke: честно скажи, что публичной ссылки уже нет.
-- Если после revoke пользователь всё ещё хочет поделиться файлом, предложи заново сделать `disk publish` или workflow `yacli-send-link-by-mail`.
+- Если после revoke пользователь всё ещё хочет поделиться файлом, предложи заново сделать `disk publish` или workflow `yamcli-send-link-by-mail`.

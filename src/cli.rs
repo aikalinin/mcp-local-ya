@@ -77,7 +77,7 @@ const HELP_TEMPLATE: &str = "\
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "yacli",
+    name = "yamcli",
     version,
     about = "Командная строка для Яндекс Почты, Календаря и Диска"
 )]
@@ -198,7 +198,7 @@ pub enum Command {
         #[command(subcommand)]
         action: ActivityCommand,
     },
-    /// Показать готовые кросс-сервисные workflow yacli.
+    /// Показать готовые кросс-сервисные workflow yamcli.
     Workflow {
         #[command(subcommand)]
         action: WorkflowCommand,
@@ -290,7 +290,7 @@ pub enum Command {
         #[command(subcommand)]
         action: Option<McpCommand>,
     },
-    /// Обновить yacli из GitHub Releases.
+    /// Обновить yamcli из GitHub Releases.
     Update {
         #[arg(
             long,
@@ -312,7 +312,7 @@ pub enum Command {
 
 #[derive(Debug, Subcommand)]
 pub enum McpCommand {
-    /// Установить yacli MCP сервер в локально доступные клиенты.
+    /// Установить yamcli MCP сервер в локально доступные клиенты.
     Install {
         #[arg(long = "client", value_enum, value_name = "КЛИЕНТ")]
         client: Vec<McpClientArg>,

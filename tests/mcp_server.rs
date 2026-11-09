@@ -7,24 +7,24 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Command as StdCommand, Stdio};
 use tempfile::tempdir;
 
-const APP_RESOURCE_URI: &str = "ui://yacli/dashboard";
+const APP_RESOURCE_URI: &str = "ui://yamcli/dashboard";
 const APP_RESOURCE_URI_TEMPLATE: &str =
-    "ui://yacli/dashboard{?account,section,resource,tool,skill,prompt,workflow,activity,goal}";
+    "ui://yamcli/dashboard{?account,section,resource,tool,skill,prompt,workflow,activity,goal}";
 const APP_RESOURCE_MIME_TYPE: &str = "text/html;profile=mcp-app";
 
-fn yacli() -> Command {
-    let mut command = Command::cargo_bin("yacli").expect("binary exists");
-    command.env("YACLI_SECRET_BACKEND", "file");
+fn yamcli() -> Command {
+    let mut command = Command::cargo_bin("yamcli").expect("binary exists");
+    command.env("YAMCLI_SECRET_BACKEND", "file");
     command
 }
 
 fn current_release_update_target() -> &'static str {
     match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("macos", "aarch64") => "yacli-aarch64-apple-darwin.tar.gz",
-        ("macos", "x86_64") => "yacli-x86_64-apple-darwin.tar.gz",
-        ("linux", "aarch64") => "yacli-aarch64-unknown-linux-gnu.tar.gz",
-        ("linux", "x86_64") => "yacli-x86_64-unknown-linux-gnu.tar.gz",
-        ("windows", "x86_64") => "yacli-x86_64-pc-windows-msvc.zip",
+        ("macos", "aarch64") => "yamcli-aarch64-apple-darwin.tar.gz",
+        ("macos", "x86_64") => "yamcli-x86_64-apple-darwin.tar.gz",
+        ("linux", "aarch64") => "yamcli-aarch64-unknown-linux-gnu.tar.gz",
+        ("linux", "x86_64") => "yamcli-x86_64-unknown-linux-gnu.tar.gz",
+        ("windows", "x86_64") => "yamcli-x86_64-pc-windows-msvc.zip",
         (os, arch) => panic!("unsupported published auto-update target {arch}-{os}"),
     }
 }
@@ -316,7 +316,7 @@ fn basic_auth_header(account: &str, app_password: &str) -> String {
 
 #[test]
 fn mcp_stdio_initialize_returns_capabilities() {
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(initialize_request(true))
         .assert()
@@ -327,7 +327,7 @@ fn mcp_stdio_initialize_returns_capabilities() {
 
     let response = parse_responses(&output).remove(0);
     assert_eq!(response["result"]["protocolVersion"], "2025-11-25");
-    assert_eq!(response["result"]["serverInfo"]["name"], "yacli");
+    assert_eq!(response["result"]["serverInfo"]["name"], "yamcli");
     assert_eq!(response["result"]["capabilities"]["completions"], json!({}));
     assert_eq!(
         response["result"]["capabilities"]["prompts"]["listChanged"],
@@ -357,7 +357,7 @@ fn mcp_stdio_accepts_claude_code_json_line_messages() {
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -371,14 +371,14 @@ fn mcp_stdio_accepts_claude_code_json_line_messages() {
 
     let responses = parse_json_line_responses(&output);
     assert_eq!(responses[0]["result"]["protocolVersion"], "2025-11-25");
-    assert_eq!(responses[0]["result"]["serverInfo"]["name"], "yacli");
+    assert_eq!(responses[0]["result"]["serverInfo"]["name"], "yamcli");
 
     let tools = responses[1]["result"]["tools"]
         .as_array()
         .expect("tools array");
     let snapshot_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.app.snapshot")
+        .find(|tool| tool["name"] == "yamcli.app.snapshot")
         .expect("snapshot tool");
     assert_eq!(
         snapshot_tool["_meta"]["ui"]["resourceUri"],
@@ -392,7 +392,7 @@ fn mcp_stdio_accepts_claude_code_json_line_messages() {
     ]
     .concat();
 
-    let prompts_output = yacli()
+    let prompts_output = yamcli()
         .args(["mcp"])
         .write_stdin(prompts_input)
         .assert()
@@ -443,7 +443,7 @@ fn mcp_stdio_accepts_claude_code_json_line_messages() {
 
 #[test]
 fn mcp_stdio_rejects_operational_requests_before_initialize() {
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(mcp_request(2, "tools/list", json!({})))
         .assert()
@@ -482,7 +482,7 @@ fn mcp_stdio_lists_and_renders_embedded_prompts() {
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -500,15 +500,15 @@ fn mcp_stdio_lists_and_renders_embedded_prompts() {
         .iter()
         .find(|prompt| prompt["name"] == "mail")
         .expect("mail prompt");
-    assert_eq!(mail_prompt["title"], "Почтовый workflow yacli");
+    assert_eq!(mail_prompt["title"], "Почтовый workflow yamcli");
 
     let rendered = responses[2]["result"]["messages"][0]["content"]["text"]
         .as_str()
         .expect("prompt text");
     assert!(rendered.contains("Запрос: invoice"));
     assert!(rendered.contains("Аккаунт: work"));
-    assert!(rendered.contains("yacli.mail.search"));
-    assert!(rendered.contains("yacli.mail.read"));
+    assert!(rendered.contains("yamcli.mail.search"));
+    assert!(rendered.contains("yamcli.mail.read"));
 
     let invite_prompt = prompts
         .iter()
@@ -553,7 +553,7 @@ fn mcp_stdio_completes_prompt_and_resource_arguments() {
             json!({
                 "ref": {
                     "type": "ref/resource",
-                    "uri": "resource://yacli/account/{account}"
+                    "uri": "resource://yamcli/account/{account}"
                 },
                 "argument": {
                     "name": "account",
@@ -567,19 +567,19 @@ fn mcp_stdio_completes_prompt_and_resource_arguments() {
             json!({
                 "ref": {
                     "type": "ref/resource",
-                    "uri": "resource://yacli/skill/{skill}"
+                    "uri": "resource://yamcli/skill/{skill}"
                 },
                 "argument": {
                     "name": "skill",
-                    "value": "yacli-ma"
+                    "value": "yamcli-ma"
                 }
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -594,19 +594,19 @@ fn mcp_stdio_completes_prompt_and_resource_arguments() {
     assert_eq!(responses[2]["result"]["completion"]["values"][0], "mock");
     assert_eq!(
         responses[3]["result"]["completion"]["values"][0],
-        "yacli-mail"
+        "yamcli-mail"
     );
 }
 
 #[test]
 fn mcp_stdio_requests_client_roots_and_refreshes_after_list_changed() {
-    let mut child = StdCommand::new(assert_cmd::cargo::cargo_bin("yacli"))
+    let mut child = StdCommand::new(assert_cmd::cargo::cargo_bin("yamcli"))
         .arg("mcp")
-        .env("YACLI_SECRET_BACKEND", "file")
+        .env("YAMCLI_SECRET_BACKEND", "file")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn yacli mcp");
+        .expect("spawn yamcli mcp");
 
     let mut stdin = child.stdin.take().expect("stdin");
     let stdout = child.stdout.take().expect("stdout");
@@ -628,7 +628,7 @@ fn mcp_stdio_requests_client_roots_and_refreshes_after_list_changed() {
     let tools = tools_list["result"]["tools"].as_array().expect("tools");
     let roots_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.roots.list")
+        .find(|tool| tool["name"] == "yamcli.roots.list")
         .expect("roots tool");
     assert_eq!(roots_tool["_meta"]["ui"]["resourceUri"], APP_RESOURCE_URI);
 
@@ -638,7 +638,7 @@ fn mcp_stdio_requests_client_roots_and_refreshes_after_list_changed() {
                 3,
                 "tools/call",
                 json!({
-                    "name": "yacli.roots.list",
+                    "name": "yamcli.roots.list",
                     "arguments": {}
                 }),
             )
@@ -684,7 +684,7 @@ fn mcp_stdio_requests_client_roots_and_refreshes_after_list_changed() {
                 4,
                 "tools/call",
                 json!({
-                    "name": "yacli.roots.list",
+                    "name": "yamcli.roots.list",
                     "arguments": {}
                 }),
             )
@@ -733,7 +733,7 @@ fn mcp_stdio_does_not_advertise_roots_without_client_capability() {
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -746,7 +746,7 @@ fn mcp_stdio_does_not_advertise_roots_without_client_capability() {
     let tools = responses[1]["result"]["tools"]
         .as_array()
         .expect("tools array");
-    assert!(tools.iter().all(|tool| tool["name"] != "yacli.roots.list"));
+    assert!(tools.iter().all(|tool| tool["name"] != "yamcli.roots.list"));
 }
 
 #[test]
@@ -776,7 +776,7 @@ client_id = "client-123"
             3,
             "tools/call",
             json!({
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "broken-recipient",
@@ -789,7 +789,7 @@ client_id = "client-123"
             4,
             "tools/call",
             json!({
-                "name": "yacli.mail.reply",
+                "name": "yamcli.mail.reply",
                 "arguments": {
                     "account": "mock",
                     "uid": 42
@@ -800,7 +800,7 @@ client_id = "client-123"
             5,
             "tools/call",
             json!({
-                "name": "yacli.mail.forward",
+                "name": "yamcli.mail.forward",
                 "arguments": {
                     "account": "mock",
                     "uid": 42,
@@ -811,8 +811,8 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -825,32 +825,32 @@ client_id = "client-123"
     let tools = responses[1]["result"]["tools"]
         .as_array()
         .expect("tools array");
-    assert!(tools.iter().any(|tool| tool["name"] == "yacli.mail.send"));
+    assert!(tools.iter().any(|tool| tool["name"] == "yamcli.mail.send"));
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.mail.send_link")
+            .any(|tool| tool["name"] == "yamcli.mail.send_link")
     );
-    assert!(tools.iter().any(|tool| tool["name"] == "yacli.mail.reply"));
+    assert!(tools.iter().any(|tool| tool["name"] == "yamcli.mail.reply"));
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.mail.forward")
-    );
-    assert!(
-        tools
-            .iter()
-            .any(|tool| tool["name"] == "yacli.mail.attachment.export")
+            .any(|tool| tool["name"] == "yamcli.mail.forward")
     );
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.mail.invite.inspect")
+            .any(|tool| tool["name"] == "yamcli.mail.attachment.export")
     );
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.mail.invite.create_event")
+            .any(|tool| tool["name"] == "yamcli.mail.invite.inspect")
+    );
+    assert!(
+        tools
+            .iter()
+            .any(|tool| tool["name"] == "yamcli.mail.invite.create_event")
     );
 
     assert_eq!(responses[2]["error"]["code"], -32602);
@@ -879,7 +879,7 @@ client_id = "client-123"
 
     let attachment_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.mail.attachment.export")
+        .find(|tool| tool["name"] == "yamcli.mail.attachment.export")
         .expect("attachment export tool");
     assert_eq!(
         attachment_tool["inputSchema"]["required"],
@@ -887,7 +887,7 @@ client_id = "client-123"
     );
     let send_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.mail.send")
+        .find(|tool| tool["name"] == "yamcli.mail.send")
         .expect("send tool");
     assert_eq!(
         send_tool["inputSchema"]["properties"]["attachments"]["type"],
@@ -899,7 +899,7 @@ client_id = "client-123"
     );
     let send_link_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.mail.send_link")
+        .find(|tool| tool["name"] == "yamcli.mail.send_link")
         .expect("send-link tool");
     assert_eq!(
         send_link_tool["inputSchema"]["required"],
@@ -911,12 +911,12 @@ client_id = "client-123"
     );
     let invite_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.mail.invite.inspect")
+        .find(|tool| tool["name"] == "yamcli.mail.invite.inspect")
         .expect("invite inspect tool");
     assert_eq!(invite_tool["inputSchema"]["required"], json!(["uid"]));
     let invite_create_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.mail.invite.create_event")
+        .find(|tool| tool["name"] == "yamcli.mail.invite.create_event")
         .expect("invite create tool");
     assert_eq!(
         invite_create_tool["inputSchema"]["required"],
@@ -924,7 +924,7 @@ client_id = "client-123"
     );
     let calendar_create_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.calendar.create")
+        .find(|tool| tool["name"] == "yamcli.calendar.create")
         .expect("calendar create tool");
     assert_eq!(
         calendar_create_tool["inputSchema"]["properties"]["dry_run"]["type"],
@@ -962,7 +962,7 @@ client_id = "client-123"
             2,
             "tools/call",
             json!({
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -976,9 +976,9 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -1065,7 +1065,7 @@ client_id = "client-123"
             2,
             "tools/call",
             json!({
-                "name": "yacli.mail.send_link",
+                "name": "yamcli.mail.send_link",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -1080,9 +1080,9 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -1231,7 +1231,7 @@ client_id = "client-123"
             2,
             "tools/call",
             json!({
-                "name": "yacli.mail.send_link",
+                "name": "yamcli.mail.send_link",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -1245,10 +1245,10 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_SEND_POLICY", "send")
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_SEND_POLICY", "send")
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -1266,12 +1266,12 @@ client_id = "client-123"
     );
     assert_eq!(
         structured["partial"]["recovery"]["retry_mail_step"]["tool"],
-        "yacli.mail.send_published_link"
+        "yamcli.mail.send_published_link"
     );
 
-    let activity = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let activity = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -1342,7 +1342,7 @@ client_id = "client-123"
             2,
             "tools/call",
             json!({
-                "name": "yacli.mail.send",
+                "name": "yamcli.mail.send",
                 "arguments": {
                     "account": "mock",
                     "to": "person@example.com",
@@ -1356,9 +1356,9 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -1402,8 +1402,8 @@ client_id = "client-123"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(
             [
@@ -1413,7 +1413,7 @@ client_id = "client-123"
                     2,
                     "tools/call",
                     json!({
-                        "name": "yacli.mail.attachment.export",
+                        "name": "yamcli.mail.attachment.export",
                         "arguments": {
                             "account": "mock",
                             "uid": 42,
@@ -1436,7 +1436,7 @@ client_id = "client-123"
         responses[1]["error"]["message"]
             .as_str()
             .expect("message")
-            .contains("yacli.mail.attachment.export requires `index` or `name`")
+            .contains("yamcli.mail.attachment.export requires `index` or `name`")
     );
 }
 
@@ -1459,8 +1459,8 @@ client_id = "client-123"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(
             [
@@ -1470,7 +1470,7 @@ client_id = "client-123"
                     2,
                     "tools/call",
                     json!({
-                        "name": "yacli.mail.invite.inspect",
+                        "name": "yamcli.mail.invite.inspect",
                         "arguments": {
                             "account": "mock",
                             "uid": 42
@@ -1492,7 +1492,7 @@ client_id = "client-123"
         responses[1]["error"]["message"]
             .as_str()
             .expect("message")
-            .contains("yacli.mail.invite.inspect requires `index` or `name`")
+            .contains("yamcli.mail.invite.inspect requires `index` or `name`")
     );
 }
 
@@ -1515,8 +1515,8 @@ client_id = "client-123"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(
             [
@@ -1526,7 +1526,7 @@ client_id = "client-123"
                     2,
                     "tools/call",
                     json!({
-                        "name": "yacli.mail.invite.create_event",
+                        "name": "yamcli.mail.invite.create_event",
                         "arguments": {
                             "account": "mock",
                             "uid": 42
@@ -1548,7 +1548,7 @@ client_id = "client-123"
         responses[1]["error"]["message"]
             .as_str()
             .expect("message")
-            .contains("yacli.mail.invite.create_event requires `index` or `name`")
+            .contains("yamcli.mail.invite.create_event requires `index` or `name`")
     );
 }
 
@@ -1573,9 +1573,9 @@ client_id = "client-123"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(
             [
@@ -1585,7 +1585,7 @@ client_id = "client-123"
                     2,
                     "tools/call",
                     json!({
-                        "name": "yacli.mail.send",
+                        "name": "yamcli.mail.send",
                         "arguments": {
                             "account": "mock",
                             "to": "person@example.com",
@@ -1811,7 +1811,7 @@ END:VCALENDAR]]></c:calendar-data>
             3,
             "tools/call",
             json!({
-                "name": "yacli.calendar.create",
+                "name": "yamcli.calendar.create",
                 "arguments": {
                     "account": "mock",
                     "summary": "Синк команды",
@@ -1824,7 +1824,7 @@ END:VCALENDAR]]></c:calendar-data>
             4,
             "tools/call",
             json!({
-                "name": "yacli.calendar.delete",
+                "name": "yamcli.calendar.delete",
                 "arguments": {
                     "account": "mock",
                     "uid": "event-1"
@@ -1834,8 +1834,8 @@ END:VCALENDAR]]></c:calendar-data>
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -1851,12 +1851,12 @@ END:VCALENDAR]]></c:calendar-data>
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.calendar.create")
+            .any(|tool| tool["name"] == "yamcli.calendar.create")
     );
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.calendar.delete")
+            .any(|tool| tool["name"] == "yamcli.calendar.delete")
     );
 
     assert_eq!(
@@ -1971,7 +1971,7 @@ secret = "calendar-secret"
             2,
             "tools/call",
             json!({
-                "name": "yacli.calendar.create",
+                "name": "yamcli.calendar.create",
                 "arguments": {
                     "account": "mock",
                     "summary": "Синк команды",
@@ -1985,8 +1985,8 @@ secret = "calendar-secret"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -2126,7 +2126,7 @@ client_id = "client-123"
             3,
             "tools/call",
             json!({
-                "name": "yacli.disk.mkdir",
+                "name": "yamcli.disk.mkdir",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/new-folder"
@@ -2137,7 +2137,7 @@ client_id = "client-123"
             4,
             "tools/call",
             json!({
-                "name": "yacli.disk.upload",
+                "name": "yamcli.disk.upload",
                 "arguments": {
                     "account": "mock",
                     "source": source_path.to_str().expect("utf8 path"),
@@ -2149,15 +2149,15 @@ client_id = "client-123"
             5,
             "resources/read",
             json!({
-                "uri": "resource://yacli/activity"
+                "uri": "resource://yamcli/activity"
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -2170,11 +2170,15 @@ client_id = "client-123"
     let tools = responses[1]["result"]["tools"]
         .as_array()
         .expect("tools array");
-    assert!(tools.iter().any(|tool| tool["name"] == "yacli.disk.mkdir"));
-    assert!(tools.iter().any(|tool| tool["name"] == "yacli.disk.upload"));
+    assert!(tools.iter().any(|tool| tool["name"] == "yamcli.disk.mkdir"));
+    assert!(
+        tools
+            .iter()
+            .any(|tool| tool["name"] == "yamcli.disk.upload")
+    );
     let disk_upload_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.disk.upload")
+        .find(|tool| tool["name"] == "yamcli.disk.upload")
         .expect("disk upload tool");
     assert_eq!(
         disk_upload_tool["inputSchema"]["properties"]["dry_run"]["type"],
@@ -2182,7 +2186,7 @@ client_id = "client-123"
     );
     let disk_publish_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.disk.publish")
+        .find(|tool| tool["name"] == "yamcli.disk.publish")
         .expect("disk publish tool");
     assert_eq!(
         disk_publish_tool["inputSchema"]["properties"]["dry_run"]["type"],
@@ -2190,7 +2194,7 @@ client_id = "client-123"
     );
     let disk_unpublish_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.disk.unpublish")
+        .find(|tool| tool["name"] == "yamcli.disk.unpublish")
         .expect("disk unpublish tool");
     assert_eq!(
         disk_unpublish_tool["inputSchema"]["properties"]["dry_run"]["type"],
@@ -2198,7 +2202,7 @@ client_id = "client-123"
     );
     let disk_upload_link_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.disk.upload_link")
+        .find(|tool| tool["name"] == "yamcli.disk.upload_link")
         .expect("disk upload-link tool");
     assert_eq!(
         disk_upload_link_tool["inputSchema"]["properties"]["dry_run"]["type"],
@@ -2236,9 +2240,9 @@ client_id = "client-123"
     assert_eq!(activity_items[1]["operation"], "disk.mkdir");
     assert_eq!(activity_items[1]["source"], "mcp");
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["activity", "list", "--limit", "5"])
         .assert()
         .success()
@@ -2260,15 +2264,15 @@ client_id = "client-123"
             2,
             "resources/read",
             json!({
-                "uri": format!("resource://yacli/activity/{activity_id}")
+                "uri": format!("resource://yamcli/activity/{activity_id}")
             }),
         ),
     ]
     .concat();
 
-    let detail_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let detail_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(detail_input)
         .assert()
@@ -2412,7 +2416,7 @@ client_id = "client-123"
             3,
             "tools/call",
             json!({
-                "name": "yacli.disk.download",
+                "name": "yamcli.disk.download",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/guide.pdf",
@@ -2423,10 +2427,10 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
-        .env("YACLI_DISK_TOKEN", "disk-token")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
+        .env("YAMCLI_DISK_TOKEN", "disk-token")
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -2442,7 +2446,7 @@ client_id = "client-123"
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.disk.download")
+            .any(|tool| tool["name"] == "yamcli.disk.download")
     );
     assert_eq!(
         responses[2]["result"]["structuredContent"]["resource"]["resource_type"],
@@ -2526,7 +2530,7 @@ client_id = "client-123"
             3,
             "tools/call",
             json!({
-                "name": "yacli.disk.publish",
+                "name": "yamcli.disk.publish",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/report.pdf"
@@ -2536,8 +2540,8 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -2553,7 +2557,7 @@ client_id = "client-123"
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.disk.publish")
+            .any(|tool| tool["name"] == "yamcli.disk.publish")
     );
     assert_eq!(
         responses[2]["result"]["structuredContent"]["resource"]["public_url"],
@@ -2667,7 +2671,7 @@ client_id = "client-123"
             3,
             "tools/call",
             json!({
-                "name": "yacli.disk.publish",
+                "name": "yamcli.disk.publish",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/report.pdf"
@@ -2678,14 +2682,14 @@ client_id = "client-123"
             4,
             "resources/read",
             json!({
-                "uri": "resource://yacli/activity"
+                "uri": "resource://yamcli/activity"
             }),
         ),
     ]
     .concat();
 
-    let publish_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let publish_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(publish_input)
         .assert()
@@ -2701,7 +2705,7 @@ client_id = "client-123"
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.activity.undo")
+            .any(|tool| tool["name"] == "yamcli.activity.undo")
     );
     let activity_contents = publish_responses[3]["result"]["contents"]
         .as_array()
@@ -2723,7 +2727,7 @@ client_id = "client-123"
             2,
             "tools/call",
             json!({
-                "name": "yacli.activity.undo",
+                "name": "yamcli.activity.undo",
                 "arguments": {
                     "id": activity_id
                 }
@@ -2732,8 +2736,8 @@ client_id = "client-123"
     ]
     .concat();
 
-    let undo_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let undo_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(undo_input)
         .assert()
@@ -2848,7 +2852,7 @@ client_id = "client-123"
             3,
             "tools/call",
             json!({
-                "name": "yacli.disk.unpublish",
+                "name": "yamcli.disk.unpublish",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/report.pdf"
@@ -2858,8 +2862,8 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -2875,7 +2879,7 @@ client_id = "client-123"
     assert!(
         tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.disk.unpublish")
+            .any(|tool| tool["name"] == "yamcli.disk.unpublish")
     );
     assert_eq!(
         responses[2]["result"]["structuredContent"]["result"]["was_public"],
@@ -2943,7 +2947,7 @@ client_id = "client-123"
             2,
             "tools/call",
             json!({
-                "name": "yacli.disk.publish",
+                "name": "yamcli.disk.publish",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/report.pdf",
@@ -2954,8 +2958,8 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3030,7 +3034,7 @@ client_id = "client-123"
             2,
             "tools/call",
             json!({
-                "name": "yacli.disk.unpublish",
+                "name": "yamcli.disk.unpublish",
                 "arguments": {
                     "account": "mock",
                     "path": "disk:/docs/report.pdf",
@@ -3041,8 +3045,8 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3092,7 +3096,7 @@ client_id = "client-123"
             2,
             "tools/call",
             json!({
-                "name": "yacli.disk.upload",
+                "name": "yamcli.disk.upload",
                 "arguments": {
                     "account": "mock",
                     "source": source_path.to_str().expect("utf8 path"),
@@ -3104,9 +3108,9 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3154,7 +3158,7 @@ client_id = "client-123"
             2,
             "tools/call",
             json!({
-                "name": "yacli.disk.upload_link",
+                "name": "yamcli.disk.upload_link",
                 "arguments": {
                     "account": "mock",
                     "source": source_path.to_str().expect("utf8 path"),
@@ -3166,9 +3170,9 @@ client_id = "client-123"
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3199,7 +3203,7 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
             4,
             "tools/call",
             json!({
-                "name": "yacli.app.snapshot",
+                "name": "yamcli.app.snapshot",
                 "arguments": {}
             }),
         ),
@@ -3213,7 +3217,7 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3228,7 +3232,7 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
         .expect("tools array");
     let snapshot_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.app.snapshot")
+        .find(|tool| tool["name"] == "yamcli.app.snapshot")
         .expect("snapshot tool");
     assert_eq!(
         snapshot_tool["_meta"]["ui"]["resourceUri"],
@@ -3239,7 +3243,7 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
 
     let account_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.account.current")
+        .find(|tool| tool["name"] == "yamcli.account.current")
         .expect("account tool");
     assert_eq!(account_tool["_meta"]["ui"]["resourceUri"], APP_RESOURCE_URI);
     assert_eq!(account_tool["_meta"]["ui"]["visibility"][0], "model");
@@ -3247,7 +3251,7 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
 
     let update_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.update.check")
+        .find(|tool| tool["name"] == "yamcli.update.check")
         .expect("update tool");
     assert_eq!(update_tool["_meta"]["ui"]["resourceUri"], APP_RESOURCE_URI);
     assert_eq!(update_tool["_meta"]["ui"]["visibility"][0], "model");
@@ -3297,7 +3301,7 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
     assert!(html.contains("ui/notifications/tool-input"));
     assert!(html.contains("ui/notifications/tool-result"));
     assert!(html.contains("tools/call"));
-    assert!(html.contains("yacli.app.snapshot"));
+    assert!(html.contains("yamcli.app.snapshot"));
     assert!(html.contains("Refresh snapshot"));
     assert!(html.contains("tool-name-input"));
     assert!(html.contains("tool-args-input"));
@@ -3345,7 +3349,7 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
     assert!(html.contains("Share goal remediation"));
     assert!(html.contains("Share goal replay"));
     assert!(html.contains("Share goal route"));
-    assert!(html.contains("yacli.goal.route"));
+    assert!(html.contains("yamcli.goal.route"));
     assert!(html.contains("workflow-name-input"));
     assert!(html.contains("List workflows"));
     assert!(html.contains("Open selected workflow"));
@@ -3355,8 +3359,8 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
     assert!(html.contains("Preview workflow action"));
     assert!(html.contains("Apply workflow action"));
     assert!(html.contains("Share workflow replay"));
-    assert!(html.contains("resource://yacli/workflows"));
-    assert!(html.contains("resource://yacli/workflow/"));
+    assert!(html.contains("resource://yamcli/workflows"));
+    assert!(html.contains("resource://yamcli/workflow/"));
     assert!(html.contains("renderWorkflowCatalog"));
     assert!(html.contains("renderWorkflow"));
     assert!(html.contains("workflowCatalogItems"));
@@ -3401,8 +3405,8 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
     assert!(html.contains("Open selected action"));
     assert!(html.contains("Undo selected action"));
     assert!(html.contains("Share replay"));
-    assert!(html.contains("resource://yacli/activity"));
-    assert!(html.contains("resource://yacli/activity/"));
+    assert!(html.contains("resource://yamcli/activity"));
+    assert!(html.contains("resource://yamcli/activity/"));
     assert!(html.contains("renderActivityCatalog"));
     assert!(html.contains("renderActivity"));
     assert!(html.contains("activityCatalogItems"));
@@ -3429,7 +3433,7 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
     assert!(html.contains("prompt-json"));
     assert!(html.contains("Share snapshot"));
     assert!(html.contains("Share current view"));
-    assert!(html.contains("Current yacli dashboard view"));
+    assert!(html.contains("Current yamcli dashboard view"));
     assert!(html.contains("buildCurrentViewUri"));
     assert!(html.contains("APP_VIEW_STATE_STORAGE_KEY"));
     assert!(html.contains("APP_RUNTIME_STATE_STORAGE_KEY"));
@@ -3478,16 +3482,16 @@ fn mcp_stdio_apps_capable_clients_receive_ui_metadata_and_resources() {
     assert!(html.contains("applyWorkflowNextAction"));
     assert!(html.contains("refreshOnboardingResource"));
     assert!(html.contains("shareOnboarding"));
-    assert!(html.contains("resource://yacli/suggestions"));
-    assert!(html.contains("resource://yacli/onboarding"));
+    assert!(html.contains("resource://yamcli/suggestions"));
+    assert!(html.contains("resource://yamcli/onboarding"));
     assert!(html.contains("refreshDoctorResource"));
     assert!(html.contains("shareDoctor"));
     assert!(html.contains("applySafeDoctorFixes"));
-    assert!(html.contains("resource://yacli/doctor"));
-    assert!(html.contains("resource://yacli/next-actions"));
+    assert!(html.contains("resource://yamcli/doctor"));
+    assert!(html.contains("resource://yamcli/next-actions"));
     assert!(html.contains("refreshHomeResource"));
     assert!(html.contains("refreshNextActionsResource"));
-    assert!(html.contains("resource://yacli/home"));
+    assert!(html.contains("resource://yamcli/home"));
     assert!(html.contains("homePayload"));
     assert!(html.contains("nextActionsPayload"));
     assert!(html.contains("refreshHome"));
@@ -3511,13 +3515,13 @@ fn mcp_stdio_reads_account_aware_dashboard_resource() {
             2,
             "resources/read",
             json!({
-                "uri": "ui://yacli/dashboard?account=work&section=auth&resource=auth&tool=yacli.auth.status"
+                "uri": "ui://yamcli/dashboard?account=work&section=auth&resource=auth&tool=yamcli.auth.status"
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3531,11 +3535,11 @@ fn mcp_stdio_reads_account_aware_dashboard_resource() {
         .as_array()
         .expect("contents array");
     let html = contents[0]["text"].as_str().expect("html");
-    assert!(html.contains("\"resourceUri\":\"ui://yacli/dashboard?account=work&section=auth&resource=auth&tool=yacli.auth.status\""));
+    assert!(html.contains("\"resourceUri\":\"ui://yamcli/dashboard?account=work&section=auth&resource=auth&tool=yamcli.auth.status\""));
     assert!(html.contains("\"defaultAccount\":\"work\""));
     assert!(html.contains("\"preferredSection\":\"auth\""));
     assert!(html.contains("\"preferredResource\":\"auth\""));
-    assert!(html.contains("\"preferredTool\":\"yacli.auth.status\""));
+    assert!(html.contains("\"preferredTool\":\"yamcli.auth.status\""));
     assert!(html.contains("dashboard opened for account"));
     assert!(html.contains("\"section restored\""));
     assert!(html.contains("state.bootstrap.preferredSection"));
@@ -3555,13 +3559,13 @@ fn mcp_stdio_reads_skill_aware_dashboard_resource() {
             2,
             "resources/read",
             json!({
-                "uri": "ui://yacli/dashboard?section=resources&resource=skill&skill=yacli-mail"
+                "uri": "ui://yamcli/dashboard?section=resources&resource=skill&skill=yamcli-mail"
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3576,8 +3580,8 @@ fn mcp_stdio_reads_skill_aware_dashboard_resource() {
         .expect("contents array");
     let html = contents[0]["text"].as_str().expect("html");
     assert!(html.contains("\"preferredResource\":\"skill\""));
-    assert!(html.contains("\"preferredSkill\":\"yacli-mail\""));
-    assert!(html.contains("resource://yacli/skill/"));
+    assert!(html.contains("\"preferredSkill\":\"yamcli-mail\""));
+    assert!(html.contains("resource://yamcli/skill/"));
     assert!(html.contains("readSkillResource"));
 }
 
@@ -3589,13 +3593,13 @@ fn mcp_stdio_reads_prompt_aware_dashboard_resource() {
             2,
             "resources/read",
             json!({
-                "uri": "ui://yacli/dashboard?section=prompts&prompt=mail"
+                "uri": "ui://yamcli/dashboard?section=prompts&prompt=mail"
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3623,13 +3627,13 @@ fn mcp_stdio_reads_workflow_aware_dashboard_resource() {
             2,
             "resources/read",
             json!({
-                "uri": "ui://yacli/dashboard?section=workflows&workflow=invite-to-calendar"
+                "uri": "ui://yamcli/dashboard?section=workflows&workflow=invite-to-calendar"
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3661,13 +3665,13 @@ fn mcp_stdio_reads_goal_aware_dashboard_resource() {
             2,
             "resources/read",
             json!({
-                "uri": "ui://yacli/dashboard?section=goal&goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
+                "uri": "ui://yamcli/dashboard?section=goal&goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3696,13 +3700,13 @@ fn mcp_stdio_reads_activity_aware_dashboard_resource() {
             2,
             "resources/read",
             json!({
-                "uri": "ui://yacli/dashboard?section=activity&activity=act_20260314T104600Z_demo1234"
+                "uri": "ui://yamcli/dashboard?section=activity&activity=act_20260314T104600Z_demo1234"
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3734,13 +3738,13 @@ fn mcp_stdio_reads_home_aware_dashboard_resource() {
             2,
             "resources/read",
             json!({
-                "uri": "ui://yacli/dashboard?section=home&goal=%D0%BE%D1%82%D0%BF%D1%80%D0%B0%D0%B2%D1%8C%20%D1%84%D0%B0%D0%B9%D0%BB"
+                "uri": "ui://yamcli/dashboard?section=home&goal=%D0%BE%D1%82%D0%BF%D1%80%D0%B0%D0%B2%D1%8C%20%D1%84%D0%B0%D0%B9%D0%BB"
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3769,7 +3773,7 @@ fn mcp_stdio_goal_route_tool_matches_invite_workflow_for_russian_goal() {
             2,
             "tools/call",
             json!({
-                "name": "yacli.goal.route",
+                "name": "yamcli.goal.route",
                 "arguments": {
                     "goal": "найди приглашение в письме и добавь встречу в календарь team"
                 }
@@ -3778,7 +3782,7 @@ fn mcp_stdio_goal_route_tool_matches_invite_workflow_for_russian_goal() {
     ]
     .join("");
 
-    let output = yacli()
+    let output = yamcli()
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3827,7 +3831,7 @@ fn mcp_stdio_doctor_apply_safe_tool_installs_detected_claude_desktop() {
             2,
             "tools/call",
             json!({
-                "name": "yacli.doctor.apply_safe",
+                "name": "yamcli.doctor.apply_safe",
                 "arguments": {}
             }),
         ),
@@ -3835,14 +3839,14 @@ fn mcp_stdio_doctor_apply_safe_tool_installs_detected_claude_desktop() {
             3,
             "resources/read",
             json!({
-                "uri": "resource://yacli/activity"
+                "uri": "resource://yamcli/activity"
             }),
         ),
     ]
     .join("");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", config_dir.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", config_dir.path())
         .env("HOME", home_dir.path())
         .args(["mcp"])
         .write_stdin(input)
@@ -3878,7 +3882,7 @@ fn mcp_stdio_doctor_apply_safe_tool_installs_detected_claude_desktop() {
     assert_eq!(activity_payload["items"][0]["source"], "mcp");
     assert_eq!(
         activity_payload["items"][0]["replay_command"],
-        "yacli doctor --apply-safe"
+        "yamcli doctor --apply-safe"
     );
     assert!(expected_config.exists());
 }
@@ -3901,15 +3905,15 @@ fn mcp_stdio_update_check_tool_reads_release_mirror() {
             2,
             "tools/call",
             json!({
-                "name": "yacli.update.check",
+                "name": "yamcli.update.check",
                 "arguments": {}
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_UPDATE_BASE_URL", &base_url)
+    let output = yamcli()
+        .env("YAMCLI_UPDATE_BASE_URL", &base_url)
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -3947,7 +3951,7 @@ imap_host = "imap.yandex.com"
 imap_port = 993
 smtp_host = "smtp.yandex.com"
 smtp_port = 465
-credential_ref = "env:YACLI_MAIL_TOKEN"
+credential_ref = "env:YAMCLI_MAIL_TOKEN"
 
 [accounts.personal.calendar]
 enabled = true
@@ -3968,126 +3972,126 @@ rest_base_url = "https://cloud-api.yandex.net"
             3,
             "resources/read",
             json!({
-                "uri": "resource://yacli/account/personal"
+                "uri": "resource://yamcli/account/personal"
             }),
         ),
         mcp_request(
             4,
             "resources/read",
             json!({
-                "uri": "resource://yacli/auth/personal"
+                "uri": "resource://yamcli/auth/personal"
             }),
         ),
         mcp_request(
             5,
             "resources/read",
             json!({
-                "uri": "resource://yacli/skills"
+                "uri": "resource://yamcli/skills"
             }),
         ),
         mcp_request(
             6,
             "resources/read",
             json!({
-                "uri": "resource://yacli/skill/yacli-mail"
+                "uri": "resource://yamcli/skill/yamcli-mail"
             }),
         ),
         mcp_request(
             7,
             "resources/read",
             json!({
-                "uri": "resource://yacli/workflows"
+                "uri": "resource://yamcli/workflows"
             }),
         ),
         mcp_request(
             8,
             "resources/read",
             json!({
-                "uri": "resource://yacli/workflow/invite-to-calendar"
+                "uri": "resource://yamcli/workflow/invite-to-calendar"
             }),
         ),
         mcp_request(
             9,
             "resources/read",
             json!({
-                "uri": "resource://yacli/activity"
+                "uri": "resource://yamcli/activity"
             }),
         ),
         mcp_request(
             10,
             "resources/read",
             json!({
-                "uri": "resource://yacli/onboarding"
+                "uri": "resource://yamcli/onboarding"
             }),
         ),
         mcp_request(
             11,
             "resources/read",
             json!({
-                "uri": "resource://yacli/doctor"
+                "uri": "resource://yamcli/doctor"
             }),
         ),
         mcp_request(
             12,
             "resources/read",
             json!({
-                "uri": "resource://yacli/home"
+                "uri": "resource://yamcli/home"
             }),
         ),
         mcp_request(
             13,
             "resources/read",
             json!({
-                "uri": "resource://yacli/home/personal"
+                "uri": "resource://yamcli/home/personal"
             }),
         ),
         mcp_request(
             14,
             "resources/read",
             json!({
-                "uri": "resource://yacli/next-actions"
+                "uri": "resource://yamcli/next-actions"
             }),
         ),
         mcp_request(
             15,
             "resources/read",
             json!({
-                "uri": "resource://yacli/home/personal?goal=%D0%BE%D1%82%D0%BF%D1%80%D0%B0%D0%B2%D1%8C%20%D1%84%D0%B0%D0%B9%D0%BB%20%D0%BF%D0%BE%20%D0%BF%D0%BE%D1%87%D1%82%D0%B5"
+                "uri": "resource://yamcli/home/personal?goal=%D0%BE%D1%82%D0%BF%D1%80%D0%B0%D0%B2%D1%8C%20%D1%84%D0%B0%D0%B9%D0%BB%20%D0%BF%D0%BE%20%D0%BF%D0%BE%D1%87%D1%82%D0%B5"
             }),
         ),
         mcp_request(
             16,
             "resources/read",
             json!({
-                "uri": "resource://yacli/next-actions?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
+                "uri": "resource://yamcli/next-actions?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
             }),
         ),
         mcp_request(
             17,
             "resources/read",
             json!({
-                "uri": "resource://yacli/suggestions"
+                "uri": "resource://yamcli/suggestions"
             }),
         ),
         mcp_request(
             18,
             "resources/read",
             json!({
-                "uri": "resource://yacli/onboarding?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
+                "uri": "resource://yamcli/onboarding?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
             }),
         ),
         mcp_request(
             19,
             "resources/read",
             json!({
-                "uri": "resource://yacli/doctor?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
+                "uri": "resource://yamcli/doctor?goal=%D0%BD%D0%B0%D0%B9%D0%B4%D0%B8%20%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5"
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .env("HOME", home.path())
         .args(["mcp"])
         .write_stdin(input)
@@ -4104,71 +4108,68 @@ rest_base_url = "https://cloud-api.yandex.net"
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/account/{account}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/account/{account}")
     );
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/auth/{account}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/auth/{account}")
     );
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/skill/{skill}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/skill/{skill}")
     );
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/workflow/{workflow}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/workflow/{workflow}")
     );
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/activity/{activity}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/activity/{activity}")
     );
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/home/{account}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/home/{account}")
     );
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/home{?goal}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/home{?goal}")
     );
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/home/{account}{?goal}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/home/{account}{?goal}")
     );
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/next-actions{?goal}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/next-actions{?goal}")
     );
     assert!(templates.iter().any(
-        |template| template["uriTemplate"] == "resource://yacli/next-actions/{account}{?goal}"
+        |template| template["uriTemplate"] == "resource://yamcli/next-actions/{account}{?goal}"
     ));
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/suggestions{?goal}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/suggestions{?goal}")
+    );
+    assert!(templates.iter().any(
+        |template| template["uriTemplate"] == "resource://yamcli/suggestions/{account}{?goal}"
+    ));
+    assert!(
+        templates
+            .iter()
+            .any(|template| template["uriTemplate"] == "resource://yamcli/onboarding{?goal}")
     );
     assert!(
         templates
             .iter()
-            .any(|template| template["uriTemplate"]
-                == "resource://yacli/suggestions/{account}{?goal}")
-    );
-    assert!(
-        templates
-            .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/onboarding{?goal}")
-    );
-    assert!(
-        templates
-            .iter()
-            .any(|template| template["uriTemplate"] == "resource://yacli/doctor{?goal}")
+            .any(|template| template["uriTemplate"] == "resource://yamcli/doctor{?goal}")
     );
     assert!(
         !templates
@@ -4187,7 +4188,7 @@ rest_base_url = "https://cloud-api.yandex.net"
     assert_eq!(account_payload["current"], true);
     assert_eq!(
         account_payload["services"]["mail"]["credentialRef"],
-        "env:YACLI_MAIL_TOKEN"
+        "env:YAMCLI_MAIL_TOKEN"
     );
 
     let auth_contents = responses[3]["result"]["contents"]
@@ -4218,7 +4219,7 @@ rest_base_url = "https://cloud-api.yandex.net"
             .as_array()
             .expect("skill items")
             .iter()
-            .any(|item| item["name"] == "yacli-mail")
+            .any(|item| item["name"] == "yamcli-mail")
     );
 
     let skill_contents = responses[5]["result"]["contents"]
@@ -4226,8 +4227,8 @@ rest_base_url = "https://cloud-api.yandex.net"
         .expect("skill contents");
     assert_eq!(skill_contents[0]["mimeType"], "text/markdown");
     let skill_text = skill_contents[0]["text"].as_str().expect("skill text");
-    assert!(skill_text.contains("# yacli mail"));
-    assert!(skill_text.contains("yacli mail send"));
+    assert!(skill_text.contains("# yamcli mail"));
+    assert!(skill_text.contains("yamcli mail send"));
 
     let workflow_catalog_contents = responses[6]["result"]["contents"]
         .as_array()
@@ -4257,10 +4258,10 @@ rest_base_url = "https://cloud-api.yandex.net"
     .expect("workflow detail json");
     assert_eq!(workflow_payload["id"], "invite-to-calendar");
     assert_eq!(workflow_payload["prompt_name"], "invite-to-calendar");
-    assert_eq!(workflow_payload["skill_name"], "yacli-invite-to-calendar");
+    assert_eq!(workflow_payload["skill_name"], "yamcli-invite-to-calendar");
     assert_eq!(
         workflow_payload["primary_tool"],
-        "yacli.mail.invite.create_event"
+        "yamcli.mail.invite.create_event"
     );
     assert_eq!(
         workflow_payload["primary_operation"],
@@ -4532,17 +4533,17 @@ rest_base_url = "https://cloud-api.yandex.net"
             2,
             "tools/call",
             json!({
-                "name": "yacli.app.snapshot",
+                "name": "yamcli.app.snapshot",
                 "arguments": {}
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_HTTP_BEARER_TOKEN", "secret-token")
-        .env("YACLI_MCP_HTTP_AUTH_ISSUER", "https://auth.example.test")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_HTTP_BEARER_TOKEN", "secret-token")
+        .env("YAMCLI_MCP_HTTP_AUTH_ISSUER", "https://auth.example.test")
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -4604,15 +4605,15 @@ rest_base_url = "https://cloud-api.yandex.net"
             4,
             "tools/call",
             json!({
-                "name": "yacli.account.list",
+                "name": "yamcli.account.list",
                 "arguments": {}
             }),
         ),
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -4627,13 +4628,13 @@ rest_base_url = "https://cloud-api.yandex.net"
         .expect("tools array");
     let account_tool = tools
         .iter()
-        .find(|tool| tool["name"] == "yacli.account.current")
+        .find(|tool| tool["name"] == "yamcli.account.current")
         .expect("account tool");
     assert!(account_tool.get("_meta").is_none());
     assert!(
         !tools
             .iter()
-            .any(|tool| tool["name"] == "yacli.app.snapshot")
+            .any(|tool| tool["name"] == "yamcli.app.snapshot")
     );
 
     let resources = responses[2]["result"]["resources"]
@@ -4684,14 +4685,14 @@ rest_base_url = "https://cloud-api.yandex.net"
 "#,
     );
 
-    let mut child = StdCommand::new(assert_cmd::cargo::cargo_bin("yacli"))
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_SECRET_BACKEND", "file")
+    let mut child = StdCommand::new(assert_cmd::cargo::cargo_bin("yamcli"))
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_SECRET_BACKEND", "file")
         .args(["mcp"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn yacli mcp");
+        .expect("spawn yamcli mcp");
 
     let mut stdin = child.stdin.take().expect("stdin");
     let stdout = child.stdout.take().expect("stdout");
@@ -4712,7 +4713,7 @@ rest_base_url = "https://cloud-api.yandex.net"
                 2,
                 "resources/subscribe",
                 json!({
-                    "uri": "resource://yacli/account/personal"
+                    "uri": "resource://yamcli/account/personal"
                 }),
             )
             .as_bytes(),
@@ -4754,7 +4755,7 @@ rest_base_url = "https://cloud-api.yandex.net"
     assert_eq!(notification["method"], "notifications/resources/updated");
     assert_eq!(
         notification["params"]["uri"],
-        "resource://yacli/account/personal"
+        "resource://yamcli/account/personal"
     );
 
     let _ = child.kill();
@@ -4835,7 +4836,7 @@ fn mail_send_call(id: u64, dry_run: bool) -> String {
         id,
         "tools/call",
         json!({
-            "name": "yacli.mail.send",
+            "name": "yamcli.mail.send",
             "arguments": {
                 "account": "mock",
                 "to": "person@example.com",
@@ -4861,8 +4862,8 @@ fn mcp_stdio_mail_send_defaults_to_draft_policy_and_reports_it_in_dry_run() {
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -4876,7 +4877,7 @@ fn mcp_stdio_mail_send_defaults_to_draft_policy_and_reports_it_in_dry_run() {
     assert_eq!(dry_run["dry_run"], true);
     assert_eq!(dry_run["delivery"]["configured_policy"], "draft");
     assert_eq!(dry_run["delivery"]["effective_policy"], "draft");
-    assert_eq!(dry_run["delivery"]["env"], "YACLI_MCP_SEND_POLICY");
+    assert_eq!(dry_run["delivery"]["env"], "YAMCLI_MCP_SEND_POLICY");
 
     // The real call goes to IMAP (Drafts folder), never to SMTP.
     let error = &responses[2]["error"];
@@ -4894,9 +4895,9 @@ fn mcp_stdio_mail_send_policy_send_uses_smtp() {
 
     let input = [initialize_request(false), mail_send_call(2, false)].concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_SEND_POLICY", "send")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_SEND_POLICY", "send")
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -4919,9 +4920,9 @@ fn mcp_stdio_mail_send_rejects_unknown_policy() {
 
     let input = [initialize_request(false), mail_send_call(2, true)].concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_SEND_POLICY", "yolo")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_SEND_POLICY", "yolo")
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -4934,7 +4935,7 @@ fn mcp_stdio_mail_send_rejects_unknown_policy() {
     let message = responses[1]["error"]["message"]
         .as_str()
         .expect("error text");
-    assert!(message.contains("YACLI_MCP_SEND_POLICY"), "{message}");
+    assert!(message.contains("YAMCLI_MCP_SEND_POLICY"), "{message}");
 }
 
 #[test]
@@ -4944,9 +4945,9 @@ fn mcp_stdio_confirm_policy_falls_back_to_draft_without_elicitation_capability()
 
     let input = [initialize_request(false), mail_send_call(2, true)].concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_SEND_POLICY", "confirm")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_SEND_POLICY", "confirm")
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -4980,9 +4981,9 @@ fn mcp_stdio_confirm_policy_asks_via_elicitation_and_honours_decline() {
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_SEND_POLICY", "confirm")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_SEND_POLICY", "confirm")
         .args(["mcp"])
         .write_stdin(input)
         .assert()
@@ -5032,9 +5033,9 @@ fn mcp_stdio_confirm_policy_sends_over_smtp_after_accept() {
     ]
     .concat();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MCP_SEND_POLICY", "confirm")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MCP_SEND_POLICY", "confirm")
         .args(["mcp"])
         .write_stdin(input)
         .assert()

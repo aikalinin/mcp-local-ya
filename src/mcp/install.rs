@@ -11,12 +11,12 @@ use serde_json::{Map, Value, json};
 use tempfile::NamedTempFile;
 
 use crate::cli::{McpClientArg, McpTransportArg, OutputFormat};
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 use crate::output::RenderedOutput;
 
 use super::skills;
 
-const SERVER_NAME: &str = "yacli";
+const SERVER_NAME: &str = "yamcli";
 
 #[derive(Clone, Debug)]
 struct ServerRegistration {
@@ -178,7 +178,7 @@ fn install_client_skills(client: InstallClient, item: &mut InstallItem) {
 }
 
 fn probe_client_readiness(client: InstallClient) -> Result<ClientReadiness> {
-    let command = format!("yacli mcp install --client {}", client.label());
+    let command = format!("yamcli mcp install --client {}", client.label());
     match client {
         InstallClient::Claude => probe_native_available_readiness(client, "claude", command),
         InstallClient::Codex => probe_native_available_readiness(client, "codex", command),
@@ -390,7 +390,7 @@ fn canonical_registration(
     if transport == McpTransportArg::Http {
         let resolved_url = url.unwrap_or_else(|| "http://127.0.0.1:8787/mcp".to_string());
         url::Url::parse(&resolved_url).map_err(|err| {
-            YacliError::Validation(format!("invalid MCP HTTP URL `{resolved_url}`: {err}"))
+            YamcliError::Validation(format!("invalid MCP HTTP URL `{resolved_url}`: {err}"))
         })?;
         return Ok(ServerRegistration {
             transport,
@@ -402,7 +402,7 @@ fn canonical_registration(
     }
 
     let current = env::current_exe().map_err(|err| {
-        YacliError::Io(format!(
+        YamcliError::Io(format!(
             "failed to resolve current executable for MCP install: {err}"
         ))
     })?;
@@ -412,10 +412,10 @@ fn canonical_registration(
         .display()
         .to_string();
     let mut env_vars = BTreeMap::new();
-    if let Ok(value) = env::var("YACLI_CONFIG_DIR")
+    if let Ok(value) = env::var("YAMCLI_CONFIG_DIR")
         && !value.trim().is_empty()
     {
-        env_vars.insert("YACLI_CONFIG_DIR".to_string(), value);
+        env_vars.insert("YAMCLI_CONFIG_DIR".to_string(), value);
     }
 
     Ok(ServerRegistration {
@@ -443,7 +443,7 @@ fn install_native_get_add(
     let get_status = ProcessCommand::new(&binary)
         .args(get_args)
         .status()
-        .map_err(|err| YacliError::Io(format!("failed to run {executable}: {err}")))?;
+        .map_err(|err| YamcliError::Io(format!("failed to run {executable}: {err}")))?;
     if get_status.success() {
         return Ok(InstallItem {
             client: client.label(),
@@ -462,9 +462,9 @@ fn install_native_get_add(
     let status = ProcessCommand::new(&binary)
         .args(add_args)
         .status()
-        .map_err(|err| YacliError::Io(format!("failed to run {executable}: {err}")))?;
+        .map_err(|err| YamcliError::Io(format!("failed to run {executable}: {err}")))?;
     if !status.success() {
-        return Err(YacliError::Config(format!(
+        return Err(YamcliError::Config(format!(
             "{executable} refused to add the `{SERVER_NAME}` MCP server"
         )));
     }
@@ -498,9 +498,9 @@ fn install_native_add_only(
     let status = ProcessCommand::new(&binary)
         .args(add_args)
         .status()
-        .map_err(|err| YacliError::Io(format!("failed to run {executable}: {err}")))?;
+        .map_err(|err| YamcliError::Io(format!("failed to run {executable}: {err}")))?;
     if !status.success() {
-        return Err(YacliError::Config(format!(
+        return Err(YamcliError::Config(format!(
             "{executable} refused to add the `{SERVER_NAME}` MCP server"
         )));
     }
@@ -539,7 +539,7 @@ fn install_json_file(
     let (mut root, existed) = load_json_object(&source_path)?;
     let container = ensure_object(
         root.as_object_mut().ok_or_else(|| {
-            YacliError::Serialization(format!(
+            YamcliError::Serialization(format!(
                 "{} config root must be a JSON object",
                 client.label()
             ))
@@ -608,7 +608,7 @@ fn load_json_object(path: &Path) -> Result<(Value, bool)> {
     }
 
     let value = serde_json::from_str::<Value>(&raw).map_err(|err| {
-        YacliError::Serialization(format!("invalid JSON in {}: {err}", path.display()))
+        YamcliError::Serialization(format!("invalid JSON in {}: {err}", path.display()))
     })?;
     Ok((value, true))
 }
@@ -642,7 +642,7 @@ fn ensure_object<'a>(
     object
         .get_mut(key)
         .and_then(Value::as_object_mut)
-        .ok_or_else(|| YacliError::Serialization(format!("`{key}` must be a JSON object")))
+        .ok_or_else(|| YamcliError::Serialization(format!("`{key}` must be a JSON object")))
 }
 
 fn json_server_entry(registration: &ServerRegistration) -> Value {
@@ -692,15 +692,15 @@ fn write_backup(path: &Path) -> Result<String> {
 fn write_json_atomic(path: &Path, value: &Value) -> Result<()> {
     let parent = path
         .parent()
-        .ok_or_else(|| YacliError::Io(format!("{} has no parent directory", path.display())))?;
+        .ok_or_else(|| YamcliError::Io(format!("{} has no parent directory", path.display())))?;
     fs::create_dir_all(parent)?;
 
     let mut temp = NamedTempFile::new_in(parent)?;
     serde_json::to_writer_pretty(temp.as_file_mut(), value)
-        .map_err(|err| YacliError::Serialization(err.to_string()))?;
+        .map_err(|err| YamcliError::Serialization(err.to_string()))?;
     temp.as_file_mut().write_all(b"\n")?;
     temp.persist(path)
-        .map_err(|err| YacliError::Io(err.to_string()))?;
+        .map_err(|err| YamcliError::Io(err.to_string()))?;
     Ok(())
 }
 
@@ -857,7 +857,7 @@ fn home_dir() -> Result<PathBuf> {
     if let Some(home) = env::var_os("HOME") {
         return Ok(PathBuf::from(home));
     }
-    dirs::home_dir().ok_or_else(|| YacliError::Config("failed to resolve HOME".to_string()))
+    dirs::home_dir().ok_or_else(|| YamcliError::Config("failed to resolve HOME".to_string()))
 }
 
 fn cursor_config_path() -> Result<PathBuf> {
@@ -1126,12 +1126,12 @@ mod tests {
     fn gemini_add_args_include_env_overrides() {
         let mut env = BTreeMap::new();
         env.insert(
-            "YACLI_CONFIG_DIR".to_string(),
-            "/tmp/yacli-config".to_string(),
+            "YAMCLI_CONFIG_DIR".to_string(),
+            "/tmp/yamcli-config".to_string(),
         );
         let registration = ServerRegistration {
             transport: McpTransportArg::Stdio,
-            command: Some("/usr/local/bin/yacli".to_string()),
+            command: Some("/usr/local/bin/yamcli".to_string()),
             args: vec!["mcp".to_string()],
             env,
             url: None,
@@ -1140,8 +1140,9 @@ mod tests {
         let args = build_gemini_add_args(&registration);
 
         assert!(
-            args.windows(2)
-                .any(|pair| { pair[0] == "-e" && pair[1] == "YACLI_CONFIG_DIR=/tmp/yacli-config" })
+            args.windows(2).any(|pair| {
+                pair[0] == "-e" && pair[1] == "YAMCLI_CONFIG_DIR=/tmp/yamcli-config"
+            })
         );
     }
 }
