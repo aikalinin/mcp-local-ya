@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-REPO_SLUG="NextStat/yacli"
+REPO_SLUG="aikalinin/mcp-local-ya"
 VERSION="latest"
 INSTALL_DIR="${HOME}/.local/bin"
 BASE_URL=""

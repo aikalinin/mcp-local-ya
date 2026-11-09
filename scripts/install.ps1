@@ -40,7 +40,7 @@ function Get-DownloadBaseUrl {
     if (-not [string]::IsNullOrWhiteSpace($BaseUrl)) {
         return $BaseUrl.TrimEnd("/")
     }
-    $repo = "NextStat/yacli"
+    $repo = "aikalinin/mcp-local-ya"
     $normalized = Get-NormalizedVersion -InputVersion $Version
     if ($normalized -eq "latest") {
         return "https://github.com/$repo/releases/latest/download"

@@ -3,7 +3,7 @@ name = "yacli"
 version = "0.5.5"
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/NextStat/yacli"
+repository = "https://github.com/aikalinin/mcp-local-ya"
 rust-version = "1.85"
 description = "CLI и MCP Apps-сервер для Яндекс Почты, Календаря и Диска для людей и AI-агентов"
 

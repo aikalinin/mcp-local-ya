@@ -1,6 +1,6 @@
 class Yacli < Formula
   desc "Yandex Mail, Calendar, and Disk CLI for humans and AI agents"
-  homepage "https://github.com/NextStat/yacli"
+  homepage "https://github.com/aikalinin/mcp-local-ya"
   version "0.1.19"
   license "MIT"
 

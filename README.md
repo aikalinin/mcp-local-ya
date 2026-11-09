@@ -9,12 +9,12 @@
 <p align="center">Один аккуратный продуктовый интерфейс для терминала, ИИ-агентов и MCP-хостов.</p>
 
 <p align="center">
-  <a href="https://github.com/NextStat/yacli/releases"><img src="https://img.shields.io/github/v/release/NextStat/yacli?display_name=tag&style=for-the-badge&label=%D0%A0%D0%95%D0%9B%D0%98%D0%97" alt="Релиз"></a>
-  <a href="https://github.com/NextStat/yacli/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/NextStat/yacli/ci.yml?branch=main&style=for-the-badge&label=%D0%9F%D0%A0%D0%9E%D0%92%D0%95%D0%A0%D0%9A%D0%98" alt="Проверки"></a>
+  <a href="https://github.com/aikalinin/mcp-local-ya/releases"><img src="https://img.shields.io/github/v/release/aikalinin/mcp-local-ya?display_name=tag&style=for-the-badge&label=%D0%A0%D0%95%D0%9B%D0%98%D0%97" alt="Релиз"></a>
+  <a href="https://github.com/aikalinin/mcp-local-ya/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/aikalinin/mcp-local-ya/ci.yml?branch=main&style=for-the-badge&label=%D0%9F%D0%A0%D0%9E%D0%92%D0%95%D0%A0%D0%9A%D0%98" alt="Проверки"></a>
   <img src="https://img.shields.io/badge/MCP-Apps-ffb703?style=for-the-badge" alt="MCP Apps">
   <img src="https://img.shields.io/badge/macOS%20%7C%20Linux%20%7C%20Windows-%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D1%8B%D0%B5%20%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B8-219ebc?style=for-the-badge" alt="Готовые сборки">
   <img src="https://img.shields.io/badge/%D0%B0%D0%B2%D1%82%D0%BE%D0%BE%D0%B1%D0%BD%D0%BE%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-ready-8ecae6?style=for-the-badge" alt="Автообновление">
-  <a href="https://github.com/NextStat/yacli/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-90be6d?style=for-the-badge" alt="MIT"></a>
+  <a href="https://github.com/aikalinin/mcp-local-ya/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-90be6d?style=for-the-badge" alt="MIT"></a>
 </p>
 
 <p align="center">
@@ -70,16 +70,16 @@ TODO: добавить GIF / скриншот терминала с yacli mail l
 ### macOS и Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NextStat/yacli/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/aikalinin/mcp-local-ya/main/scripts/install.sh | sh
 ```
 
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/NextStat/yacli/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/aikalinin/mcp-local-ya/main/scripts/install.ps1 | iex
 ```
 
-Готовые сборки для macOS `x86_64`/`arm64`, Linux `x86_64`/`arm64` и Windows `x86_64` лежат в [GitHub Releases](https://github.com/NextStat/yacli/releases).
+Готовые сборки для macOS `x86_64`/`arm64`, Linux `x86_64`/`arm64` и Windows `x86_64` лежат в [GitHub Releases](https://github.com/aikalinin/mcp-local-ya/releases).
 
 <details>
 <summary>Из исходников / обновление / private mirror</summary>
@@ -104,7 +104,7 @@ yacli update --check
 **Запуск за минуту**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NextStat/yacli/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/aikalinin/mcp-local-ya/main/scripts/install.sh | sh
 yacli setup me@yandex.ru --calendar-app-password <пароль> --client claude
 ```
 
@@ -658,3 +658,7 @@ cargo build --workspace
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
+
+## Происхождение и лицензия
+
+`mcp-local-ya` — самостоятельный проект на базе [NextStat/yacli](https://github.com/NextStat/yacli) (MIT, © 2026 NextStat). Исходная история коммитов сохранена; поверх неё добавлено усиление безопасности MCP (см. [CHANGELOG.md](CHANGELOG.md)). Распространяется по той же лицензии MIT — см. [LICENSE](LICENSE).

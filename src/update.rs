@@ -17,7 +17,7 @@ use crate::cli::OutputFormat;
 use crate::error::{Result, YacliError};
 use crate::output::RenderedOutput;
 
-const REPO_SLUG: &str = "NextStat/yacli";
+const REPO_SLUG: &str = "aikalinin/mcp-local-ya";
 const DEFAULT_VERSION: &str = "latest";
 const UPDATE_BASE_URL_ENV: &str = "YACLI_UPDATE_BASE_URL";
 
@@ -542,9 +542,10 @@ mod tests {
 
     #[test]
     fn version_from_download_url_extracts_tag() {
-        let url =
-            Url::parse("https://github.com/NextStat/yacli/releases/download/v0.2.0/SHA256SUMS")
-                .expect("url");
+        let url = Url::parse(
+            "https://github.com/aikalinin/mcp-local-ya/releases/download/v0.2.0/SHA256SUMS",
+        )
+        .expect("url");
         assert_eq!(version_from_download_url(&url).as_deref(), Some("0.2.0"));
     }
 
