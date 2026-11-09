@@ -26,35 +26,35 @@ pub fn onboarding_resource_payload(goal: Option<&str>) -> Result<Value> {
                 "title": "Добавить аккаунт",
                 "status": "pending",
                 "detail": "Сначала добавьте аккаунт Яндекса и выполните базовый setup.",
-                "recommended_command": "yacli setup me@yandex.ru"
+                "recommended_command": "yamcli setup me@yandex.ru"
             }),
             json!({
                 "id": "mail",
                 "title": "Подключить Почту",
                 "status": "blocked",
                 "detail": "Почта и Диск подключаются после добавления аккаунта.",
-                "recommended_command": "yacli setup me@yandex.ru"
+                "recommended_command": "yamcli setup me@yandex.ru"
             }),
             json!({
                 "id": "calendar",
                 "title": "Подключить Календарь",
                 "status": "blocked",
                 "detail": "Календарь подключается после добавления аккаунта и пароля приложения.",
-                "recommended_command": "yacli setup me@yandex.ru --calendar-app-password <пароль>"
+                "recommended_command": "yamcli setup me@yandex.ru --calendar-app-password <пароль>"
             }),
             json!({
                 "id": "mcp_install",
                 "title": "Подключить MCP-клиент",
                 "status": "blocked",
                 "detail": "MCP имеет смысл ставить после базового setup аккаунта.",
-                "recommended_command": "yacli mcp install --client claude"
+                "recommended_command": "yamcli mcp install --client claude"
             }),
             json!({
                 "id": "workflow_hub",
                 "title": "Запустить workflow",
                 "status": "blocked",
                 "detail": "Workflow Hub станет полезен после базового setup аккаунта.",
-                "recommended_command": "yacli workflow list"
+                "recommended_command": "yamcli workflow list"
             }),
         ];
         let focus_checks = focus_checks_from_goal_route(&checks, goal_route.as_ref());
@@ -105,28 +105,28 @@ pub fn onboarding_resource_payload(goal: Option<&str>) -> Result<Value> {
             "Аккаунт",
             "completed",
             format!("Текущий аккаунт: {account_name}"),
-            Some(format!("yacli setup {}", account.email)),
+            Some(format!("yamcli setup {}", account.email)),
         ),
         service_check(
             "mail",
             "Почта",
             mail.credential_state,
             &mail.detail,
-            "yacli login",
+            "yamcli login",
         ),
         service_check(
             "calendar",
             "Календарь",
             calendar.credential_state,
             &calendar.detail,
-            "yacli login calendar --app-password <пароль>",
+            "yamcli login calendar --app-password <пароль>",
         ),
         service_check(
             "disk",
             "Диск",
             disk.credential_state,
             &disk.detail,
-            "yacli login",
+            "yamcli login",
         ),
         workflow_hub_check(
             mail.credential_state,
@@ -224,7 +224,7 @@ fn workflow_hub_check(mail: &str, calendar: &str, disk: &str) -> Value {
         "Workflow Hub",
         status,
         detail.to_string(),
-        Some("yacli workflow list".to_string()),
+        Some("yamcli workflow list".to_string()),
     )
 }
 
@@ -251,7 +251,7 @@ fn mcp_install_check(clients: &[crate::mcp::install::ClientReadiness]) -> Value 
             .join(", ");
         (
             "completed",
-            format!("yacli уже установлен в MCP-клиентах: {names}"),
+            format!("yamcli уже установлен в MCP-клиентах: {names}"),
         )
     } else if available > 0 {
         (
@@ -271,7 +271,7 @@ fn mcp_install_check(clients: &[crate::mcp::install::ClientReadiness]) -> Value 
         "Подключить MCP-клиент",
         status,
         detail,
-        Some("yacli mcp install --client claude".to_string()),
+        Some("yamcli mcp install --client claude".to_string()),
     )
 }
 

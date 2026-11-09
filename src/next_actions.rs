@@ -79,7 +79,7 @@ fn collect_actions(onboarding: &Value, doctor: &Value, goal_route: Option<&Value
             "status": "ready",
             "priority": 3,
             "reason": "Продукт уже готов. Следующий лучший шаг — запускать реальные cross-service workflows.",
-            "command": "yacli workflow list",
+            "command": "yamcli workflow list",
             "source": "product",
         }));
         actions.push(json!({
@@ -88,7 +88,7 @@ fn collect_actions(onboarding: &Value, doctor: &Value, goal_route: Option<&Value
             "status": "ready",
             "priority": 4,
             "reason": "Replay и история действий помогают закрепить рабочий контур после setup.",
-            "command": "yacli activity list",
+            "command": "yamcli activity list",
             "source": "product",
         }));
     }

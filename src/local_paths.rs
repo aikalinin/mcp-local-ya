@@ -1,14 +1,14 @@
 //! Allowlist for local filesystem paths used by MCP tools.
 //!
-//! MCP tools such as `yacli.mail.send` (`attachments`), `yacli.disk.upload`
-//! (`source`), `yacli.mail.attachment.export` and `yacli.disk.download`
+//! MCP tools such as `yamcli.mail.send` (`attachments`), `yamcli.disk.upload`
+//! (`source`), `yamcli.mail.attachment.export` and `yamcli.disk.download`
 //! (`output_path`) read or write files on the machine that runs the server.
 //! An AI agent driving those tools can be steered by untrusted content (a
 //! malicious e-mail, a document on Disk), so the server itself must bound
 //! which paths are reachable instead of trusting the caller.
 //!
 //! Policy:
-//! - `YACLI_MCP_ALLOWED_PATHS` lists directories (separated by the platform
+//! - `YAMCLI_MCP_ALLOWED_PATHS` lists directories (separated by the platform
 //!   path-list separator: `:` on Unix, `;` on Windows). Only paths inside one
 //!   of them may be read or written by MCP tools.
 //! - When the variable is unset or empty, MCP tools get no local filesystem
@@ -16,19 +16,19 @@
 //! - Symlinks are resolved before the check, so a link inside an allowed
 //!   directory that points outside of it is rejected.
 //! - A small deny-list of credential locations (`~/.ssh`, `~/.gnupg`, `~/.aws`,
-//!   `~/.kube`, `~/.docker`, `.netrc`, and yacli's own config directory) is
+//!   `~/.kube`, `~/.docker`, `.netrc`, and yamcli's own config directory) is
 //!   enforced even inside allowed directories.
 //!
-//! The CLI is not affected: a human typing `yacli mail send --attach ./x.pdf`
+//! The CLI is not affected: a human typing `yamcli mail send --attach ./x.pdf`
 //! already decided which file to use.
 
 use std::env;
 use std::path::{Component, Path, PathBuf};
 
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 use crate::paths::config_dir;
 
-pub const ALLOWED_PATHS_ENV: &str = "YACLI_MCP_ALLOWED_PATHS";
+pub const ALLOWED_PATHS_ENV: &str = "YAMCLI_MCP_ALLOWED_PATHS";
 
 const DENIED_DIR_NAMES: &[&str] = &[".ssh", ".gnupg", ".aws", ".kube", ".docker", ".git"];
 const DENIED_FILE_NAMES: &[&str] = &[
@@ -102,13 +102,13 @@ fn allowed_roots() -> Result<Vec<PathBuf>> {
         }
         let expanded = expand_home(&entry);
         let canonical = expanded.canonicalize().map_err(|err| {
-            YacliError::Config(format!(
+            YamcliError::Config(format!(
                 "{ALLOWED_PATHS_ENV} entry `{}` cannot be resolved: {err}",
                 entry.display()
             ))
         })?;
         if !canonical.is_dir() {
-            return Err(YacliError::Config(format!(
+            return Err(YamcliError::Config(format!(
                 "{ALLOWED_PATHS_ENV} entry `{}` is not a directory",
                 entry.display()
             )));
@@ -128,7 +128,7 @@ fn reject_overbroad_root(canonical: &Path, entry: &Path) -> Result<()> {
         .and_then(|home| home.canonicalize().ok())
         .is_some_and(|home| home == canonical);
     if is_fs_root || is_home {
-        return Err(YacliError::Config(format!(
+        return Err(YamcliError::Config(format!(
             "{ALLOWED_PATHS_ENV} entry `{}` is too broad (home directory or filesystem root); \
              list specific working directories instead, e.g. `$HOME/Downloads`",
             entry.display()
@@ -148,12 +148,12 @@ fn resolve_against_roots(
     protected_config_dir: Option<&Path>,
 ) -> Result<PathBuf> {
     if raw.trim().is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "local path must not be empty".to_string(),
         ));
     }
     if roots.is_empty() {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "MCP tools have no local filesystem access: refusing to {} `{raw}`. \
              Set {ALLOWED_PATHS_ENV} to the directories the MCP server may use \
              (for example `{ALLOWED_PATHS_ENV}=$HOME/Downloads`) and restart the server.",
@@ -164,13 +164,13 @@ fn resolve_against_roots(
     let requested = expand_home(Path::new(raw));
     let resolved = match access {
         LocalAccess::Read => requested.canonicalize().map_err(|err| {
-            YacliError::Validation(format!("local path `{raw}` cannot be resolved: {err}"))
+            YamcliError::Validation(format!("local path `{raw}` cannot be resolved: {err}"))
         })?,
         LocalAccess::Write => resolve_for_write(&requested, raw)?,
     };
 
     let Some(matched_root) = roots.iter().find(|root| resolved.starts_with(root)) else {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "refusing to {} `{raw}`: resolved path `{}` is outside {ALLOWED_PATHS_ENV}",
             access.verb(),
             resolved.display()
@@ -187,13 +187,13 @@ fn resolve_for_write(requested: &Path, raw: &str) -> Result<PathBuf> {
     if let Ok(meta) = &symlink_meta
         && meta.file_type().is_symlink()
     {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "refusing to write through symlink `{raw}`"
         )));
     }
     if symlink_meta.is_ok() {
         return requested.canonicalize().map_err(|err| {
-            YacliError::Validation(format!("local path `{raw}` cannot be resolved: {err}"))
+            YamcliError::Validation(format!("local path `{raw}` cannot be resolved: {err}"))
         });
     }
 
@@ -207,7 +207,7 @@ fn resolve_for_write(requested: &Path, raw: &str) -> Result<PathBuf> {
             Some(Component::Normal(name)) => tail.push(PathBuf::from(name)),
             Some(Component::CurDir) => {}
             _ => {
-                return Err(YacliError::Validation(format!(
+                return Err(YamcliError::Validation(format!(
                     "local path `{raw}` must end with a file name"
                 )));
             }
@@ -223,12 +223,12 @@ fn resolve_for_write(requested: &Path, raw: &str) -> Result<PathBuf> {
         }
     }
     if tail.is_empty() {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "local path `{raw}` must end with a file name"
         )));
     }
     let mut resolved = existing.canonicalize().map_err(|err| {
-        YacliError::Validation(format!(
+        YamcliError::Validation(format!(
             "parent directory of `{raw}` cannot be resolved: {err}"
         ))
     })?;
@@ -248,8 +248,8 @@ fn reject_denied_locations(
     if let Some(canonical_config) = protected_config_dir
         && resolved.starts_with(canonical_config)
     {
-        return Err(YacliError::Validation(format!(
-            "refusing to {} `{raw}`: yacli configuration directory is never exposed to MCP tools",
+        return Err(YamcliError::Validation(format!(
+            "refusing to {} `{raw}`: yamcli configuration directory is never exposed to MCP tools",
             access.verb()
         )));
     }
@@ -263,7 +263,7 @@ fn reject_denied_locations(
             continue;
         };
         if DENIED_DIR_NAMES.contains(&name) {
-            return Err(YacliError::Validation(format!(
+            return Err(YamcliError::Validation(format!(
                 "refusing to {} `{raw}`: `{name}` holds credentials and is never exposed to MCP tools",
                 access.verb()
             )));
@@ -284,7 +284,7 @@ fn reject_denied_locations(
             };
             let trimmed = name.trim_end_matches([' ', '.']);
             if trimmed.starts_with('.') {
-                return Err(YacliError::Validation(format!(
+                return Err(YamcliError::Validation(format!(
                     "refusing to {} `{raw}`: hidden entry `{name}` is never exposed to MCP tools",
                     access.verb()
                 )));
@@ -295,7 +295,7 @@ fn reject_denied_locations(
     if let Some(file_name) = resolved.file_name().and_then(|name| name.to_str())
         && DENIED_FILE_NAMES.contains(&file_name)
     {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "refusing to {} `{raw}`: `{file_name}` holds credentials and is never exposed to MCP tools",
             access.verb()
         )));
@@ -476,9 +476,9 @@ mod tests {
     }
 
     #[test]
-    fn denies_yacli_config_dir_even_inside_root() {
+    fn denies_yamcli_config_dir_even_inside_root() {
         let temp = tempdir().expect("tempdir");
-        let config = temp.path().join("yacli-config");
+        let config = temp.path().join("yamcli-config");
         fs::create_dir_all(&config).expect("mkdir");
         let creds = config.join("credentials.toml");
         fs::write(&creds, b"secret").expect("write");

@@ -5,9 +5,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::tempdir;
 
-fn yacli() -> Command {
-    let mut command = Command::cargo_bin("yacli").expect("binary exists");
-    command.env("YACLI_SECRET_BACKEND", "file");
+fn yamcli() -> Command {
+    let mut command = Command::cargo_bin("yamcli").expect("binary exists");
+    command.env("YAMCLI_SECRET_BACKEND", "file");
     command
 }
 
@@ -78,7 +78,7 @@ fn windsurf_legacy_config_path(home: &Path) -> PathBuf {
 
 #[test]
 fn top_level_help_exposes_mcp_command() {
-    yacli()
+    yamcli()
         .args(["--help"])
         .assert()
         .success()
@@ -88,11 +88,11 @@ fn top_level_help_exposes_mcp_command() {
 
 #[test]
 fn mcp_help_describes_server_mode() {
-    yacli()
+    yamcli()
         .args(["mcp", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("yacli mcp"))
+        .stdout(predicate::str::contains("yamcli mcp"))
         .stdout(predicate::str::contains("stdio"))
         .stdout(predicate::str::contains("http"))
         .stdout(predicate::str::contains("listen"))
@@ -101,7 +101,7 @@ fn mcp_help_describes_server_mode() {
 
 #[test]
 fn mcp_install_help_lists_target_clients() {
-    yacli()
+    yamcli()
         .args(["mcp", "install", "--help"])
         .assert()
         .success()
@@ -136,7 +136,7 @@ fn mcp_install_updates_cursor_config_idempotently() {
 }"#,
     );
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "cursor"])
         .assert()
@@ -157,9 +157,9 @@ fn mcp_install_updates_cursor_config_idempotently() {
     let installed: Value =
         serde_json::from_slice(&fs::read(&cursor_path).expect("cursor config")).expect("json");
     assert_eq!(installed["mcpServers"]["existing"]["command"], "node");
-    assert_eq!(installed["mcpServers"]["yacli"]["args"][0], "mcp");
+    assert_eq!(installed["mcpServers"]["yamcli"]["args"][0], "mcp");
 
-    let second = yacli()
+    let second = yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "cursor"])
         .assert()
@@ -190,7 +190,7 @@ fn mcp_install_updates_zed_settings() {
 }"#,
     );
 
-    yacli()
+    yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "zed"])
         .assert()
@@ -199,7 +199,7 @@ fn mcp_install_updates_zed_settings() {
     let installed: Value =
         serde_json::from_slice(&fs::read(&settings_path).expect("zed settings")).expect("json");
     assert_eq!(installed["context_servers"]["existing"]["command"], "node");
-    assert_eq!(installed["context_servers"]["yacli"]["args"][0], "mcp");
+    assert_eq!(installed["context_servers"]["yamcli"]["args"][0], "mcp");
 }
 
 #[test]
@@ -212,7 +212,7 @@ fn mcp_install_invokes_codex_native_cli() {
     let script_path = bin_dir.join("codex");
     write_logging_command(&script_path, &log_path, true);
 
-    yacli()
+    yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
         .args(["mcp", "install", "--client", "codex"])
@@ -223,7 +223,7 @@ fn mcp_install_invokes_codex_native_cli() {
     assert!(log.contains("mcp"));
     assert!(log.contains("get"));
     assert!(log.contains("add"));
-    assert!(log.contains("yacli"));
+    assert!(log.contains("yamcli"));
 }
 
 #[test]
@@ -236,7 +236,7 @@ fn mcp_install_invokes_codex_native_http_cli() {
     let script_path = bin_dir.join("codex");
     write_logging_command(&script_path, &log_path, true);
 
-    yacli()
+    yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
         .args([
@@ -267,7 +267,7 @@ fn mcp_install_invokes_claude_native_cli() {
     let script_path = bin_dir.join("claude");
     write_logging_command(&script_path, &log_path, true);
 
-    yacli()
+    yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
         .args(["mcp", "install", "--client", "claude"])
@@ -299,7 +299,7 @@ fn mcp_install_writes_claude_desktop_config() {
 }"#,
     );
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "claude-desktop"])
         .assert()
@@ -316,7 +316,7 @@ fn mcp_install_writes_claude_desktop_config() {
     let installed: Value =
         serde_json::from_slice(&fs::read(&desktop_path).expect("desktop config")).expect("json");
     assert_eq!(installed["mcpServers"]["existing"]["command"], "node");
-    assert_eq!(installed["mcpServers"]["yacli"]["args"][0], "mcp");
+    assert_eq!(installed["mcpServers"]["yamcli"]["args"][0], "mcp");
 }
 
 #[test]
@@ -332,7 +332,7 @@ fn mcp_install_claude_also_installs_claude_desktop() {
         "{\n  \"mcpServers\": {}\n}\n",
     );
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
         .args(["mcp", "install", "--client", "claude"])
@@ -350,7 +350,7 @@ fn mcp_install_claude_also_installs_claude_desktop() {
     let desktop_config: Value =
         serde_json::from_slice(&fs::read(claude_desktop_config_path(home)).expect("desktop"))
             .expect("desktop json");
-    assert_eq!(desktop_config["mcpServers"]["yacli"]["args"][0], "mcp");
+    assert_eq!(desktop_config["mcpServers"]["yamcli"]["args"][0], "mcp");
 }
 
 #[test]
@@ -363,7 +363,7 @@ fn mcp_install_invokes_claude_native_http_cli() {
     let script_path = bin_dir.join("claude");
     write_logging_command(&script_path, &log_path, true);
 
-    yacli()
+    yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
         .args([
@@ -395,10 +395,10 @@ fn mcp_install_invokes_gemini_native_cli() {
     let script_path = bin_dir.join("gemini");
     write_logging_command(&script_path, &log_path, false);
 
-    yacli()
+    yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
-        .env("YACLI_CONFIG_DIR", "/tmp/yacli-config")
+        .env("YAMCLI_CONFIG_DIR", "/tmp/yamcli-config")
         .args(["mcp", "install", "--client", "gemini"])
         .assert()
         .success();
@@ -409,8 +409,8 @@ fn mcp_install_invokes_gemini_native_cli() {
     assert!(log.contains("-s"));
     assert!(log.contains("user"));
     assert!(log.contains("-e"));
-    assert!(log.contains("YACLI_CONFIG_DIR=/tmp/yacli-config"));
-    assert!(log.contains("yacli"));
+    assert!(log.contains("YAMCLI_CONFIG_DIR=/tmp/yamcli-config"));
+    assert!(log.contains("yamcli"));
 }
 
 #[test]
@@ -423,7 +423,7 @@ fn mcp_install_invokes_gemini_native_http_cli() {
     let script_path = bin_dir.join("gemini");
     write_logging_command(&script_path, &log_path, false);
 
-    yacli()
+    yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
         .args([
@@ -455,7 +455,7 @@ fn mcp_install_invokes_antigravity_native_cli() {
     let script_path = bin_dir.join("antigravity");
     write_logging_command(&script_path, &log_path, false);
 
-    yacli()
+    yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
         .args(["mcp", "install", "--client", "antigravity"])
@@ -464,7 +464,7 @@ fn mcp_install_invokes_antigravity_native_cli() {
 
     let log = fs::read_to_string(&log_path).expect("log");
     assert!(log.contains("--add-mcp"));
-    assert!(log.contains("yacli"));
+    assert!(log.contains("yamcli"));
     assert!(log.contains("\"args\":[\"mcp\"]"));
 }
 
@@ -485,7 +485,7 @@ fn mcp_install_updates_windsurf_config_idempotently() {
 }"#,
     );
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "windsurf"])
         .assert()
@@ -502,9 +502,9 @@ fn mcp_install_updates_windsurf_config_idempotently() {
     let installed: Value =
         serde_json::from_slice(&fs::read(&config_path).expect("windsurf config")).expect("json");
     assert_eq!(installed["mcpServers"]["existing"]["command"], "node");
-    assert_eq!(installed["mcpServers"]["yacli"]["args"][0], "mcp");
+    assert_eq!(installed["mcpServers"]["yamcli"]["args"][0], "mcp");
 
-    let second = yacli()
+    let second = yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "windsurf"])
         .assert()
@@ -535,7 +535,7 @@ fn mcp_install_migrates_windsurf_legacy_config_to_current_path() {
 }"#,
     );
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "windsurf"])
         .assert()
@@ -559,7 +559,7 @@ fn mcp_install_migrates_windsurf_legacy_config_to_current_path() {
     let installed: Value =
         serde_json::from_slice(&fs::read(&current_path).expect("windsurf config")).expect("json");
     assert_eq!(installed["mcpServers"]["existing"]["command"], "node");
-    assert_eq!(installed["mcpServers"]["yacli"]["args"][0], "mcp");
+    assert_eq!(installed["mcpServers"]["yamcli"]["args"][0], "mcp");
 }
 
 #[test]
@@ -579,7 +579,7 @@ fn mcp_install_updates_warp_config_and_marks_experimental() {
 }"#,
     );
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "warp"])
         .assert()
@@ -597,7 +597,7 @@ fn mcp_install_updates_warp_config_and_marks_experimental() {
     let installed: Value =
         serde_json::from_slice(&fs::read(&config_path).expect("warp config")).expect("json");
     assert_eq!(installed["mcpServers"]["existing"]["command"], "node");
-    assert_eq!(installed["mcpServers"]["yacli"]["args"][0], "mcp");
+    assert_eq!(installed["mcpServers"]["yamcli"]["args"][0], "mcp");
 }
 
 #[test]
@@ -607,7 +607,7 @@ fn mcp_install_skips_unverified_http_registration_for_cursor() {
     let cursor_path = home.join(".cursor/mcp.json");
     write_file(&cursor_path, "{}");
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .args([
             "mcp",
@@ -647,7 +647,7 @@ fn mcp_install_fails_nonzero_when_detected_client_rejects_install() {
     );
     make_executable(&script_path);
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
         .args(["mcp", "install", "--client", "codex"])
@@ -672,7 +672,7 @@ fn mcp_install_writes_skills_to_cursor_directory() {
     fs::create_dir_all(&cursor_dir).expect("cursor dir");
     write_file(&cursor_dir.join("mcp.json"), "{}");
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "cursor"])
         .assert()
@@ -689,26 +689,26 @@ fn mcp_install_writes_skills_to_cursor_directory() {
     assert!(skills_path.contains(".cursor/skills"));
 
     let skills_dir = home.join(".cursor/skills");
-    assert!(skills_dir.join("yacli-shared/SKILL.md").exists());
-    assert!(skills_dir.join("yacli-mail/SKILL.md").exists());
-    assert!(skills_dir.join("yacli-calendar/SKILL.md").exists());
-    assert!(skills_dir.join("yacli-disk/SKILL.md").exists());
-    assert!(skills_dir.join("yacli-daily-briefing/SKILL.md").exists());
-    assert!(skills_dir.join("yacli-find-and-read/SKILL.md").exists());
+    assert!(skills_dir.join("yamcli-shared/SKILL.md").exists());
+    assert!(skills_dir.join("yamcli-mail/SKILL.md").exists());
+    assert!(skills_dir.join("yamcli-calendar/SKILL.md").exists());
+    assert!(skills_dir.join("yamcli-disk/SKILL.md").exists());
+    assert!(skills_dir.join("yamcli-daily-briefing/SKILL.md").exists());
+    assert!(skills_dir.join("yamcli-find-and-read/SKILL.md").exists());
     assert!(
         skills_dir
-            .join("yacli-reply-with-context/SKILL.md")
+            .join("yamcli-reply-with-context/SKILL.md")
             .exists()
     );
     assert!(
         skills_dir
-            .join("yacli-invite-to-calendar/SKILL.md")
+            .join("yamcli-invite-to-calendar/SKILL.md")
             .exists()
     );
 
-    let shared = fs::read_to_string(skills_dir.join("yacli-shared/SKILL.md")).expect("read");
+    let shared = fs::read_to_string(skills_dir.join("yamcli-shared/SKILL.md")).expect("read");
     assert!(shared.starts_with("---\n"));
-    assert!(shared.contains("name: yacli-shared"));
+    assert!(shared.contains("name: yamcli-shared"));
 }
 
 #[test]
@@ -721,7 +721,7 @@ fn mcp_install_writes_skills_to_claude_directory() {
     let log_path = home.join("claude.log");
     write_logging_command(&bin_dir.join("claude"), &log_path, true);
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
         .args(["mcp", "install", "--client", "claude"])
@@ -739,11 +739,11 @@ fn mcp_install_writes_skills_to_claude_directory() {
     assert!(skills_path.contains(".claude/skills"));
 
     let skills_dir = home.join(".claude/skills");
-    assert!(skills_dir.join("yacli-shared/SKILL.md").exists());
-    assert!(skills_dir.join("yacli-mail/SKILL.md").exists());
+    assert!(skills_dir.join("yamcli-shared/SKILL.md").exists());
+    assert!(skills_dir.join("yamcli-mail/SKILL.md").exists());
     assert!(
         skills_dir
-            .join("yacli-invite-to-calendar/SKILL.md")
+            .join("yamcli-invite-to-calendar/SKILL.md")
             .exists()
     );
 }
@@ -757,7 +757,7 @@ fn mcp_install_skips_skills_for_zed() {
     fs::create_dir_all(zed_dir.parent().expect("parent")).expect("zed dir");
     write_file(&zed_dir, "{}");
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "zed"])
         .assert()
@@ -782,13 +782,13 @@ fn mcp_install_skills_are_idempotent() {
     fs::create_dir_all(&cursor_dir).expect("cursor dir");
     write_file(&cursor_dir.join("mcp.json"), "{}");
 
-    yacli()
+    yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "cursor"])
         .assert()
         .success();
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .args(["mcp", "install", "--client", "cursor"])
         .assert()
@@ -812,7 +812,7 @@ fn mcp_install_writes_skills_to_agents_directory_for_codex() {
     let log_path = home.join("codex.log");
     write_logging_command(&bin_dir.join("codex"), &log_path, true);
 
-    let output = yacli()
+    let output = yamcli()
         .env("HOME", home)
         .env("PATH", prepend_path(&bin_dir))
         .args(["mcp", "install", "--client", "codex"])
@@ -829,5 +829,5 @@ fn mcp_install_writes_skills_to_agents_directory_for_codex() {
     assert!(skills_path.contains(".agents/skills"));
 
     let skills_dir = home.join(".agents/skills");
-    assert!(skills_dir.join("yacli-shared/SKILL.md").exists());
+    assert!(skills_dir.join("yamcli-shared/SKILL.md").exists());
 }

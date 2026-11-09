@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-BINARY="${1:-target/debug/yacli}"
-EXPECTED_SECRET_BACKEND="${YACLI_EXPECT_SECRET_BACKEND:-file}"
+BINARY="${1:-target/debug/yamcli}"
+EXPECTED_SECRET_BACKEND="${YAMCLI_EXPECT_SECRET_BACKEND:-file}"
 
 if [ ! -x "$BINARY" ]; then
     echo "Binary is not executable: $BINARY" >&2
@@ -14,7 +14,7 @@ if ! command -v python3 >/dev/null 2>&1; then
     exit 1
 fi
 
-tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/yacli-smoke.XXXXXX")"
+tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/yamcli-smoke.XXXXXX")"
 cleanup() {
     if [ -n "${http_pid:-}" ]; then
         kill "$http_pid" >/dev/null 2>&1 || true
@@ -50,7 +50,7 @@ current_target() {
     esac
 }
 
-printf '==> yacli version/help surface\n'
+printf '==> yamcli version/help surface\n'
 "$BINARY" --version >/dev/null
 "$BINARY" mcp --help >/dev/null
 "$BINARY" mcp install --help >/dev/null
@@ -59,7 +59,7 @@ printf '==> yacli version/help surface\n'
 
 printf '==> doctor secret backend contract\n'
 doctor_output="$(
-    YACLI_CONFIG_DIR="${tmp_root}/config" \
+    YAMCLI_CONFIG_DIR="${tmp_root}/config" \
     "$BINARY" --format json doctor
 )"
 python3 - <<'PY' "$doctor_output" "$EXPECTED_SECRET_BACKEND"
@@ -111,7 +111,7 @@ if not line:
     raise SystemExit(f"stdio initialize returned no output: {stderr}")
 payload = json.loads(line)
 assert payload["result"]["protocolVersion"] == "2025-11-25", payload
-assert payload["result"]["serverInfo"]["name"] == "yacli", payload
+assert payload["result"]["serverInfo"]["name"] == "yamcli", payload
 proc.terminate()
 proc.wait(timeout=5)
 PY
@@ -198,15 +198,15 @@ tools_list = urllib.request.Request(
 with urllib.request.urlopen(tools_list) as response:
     payload = json.load(response)
 tools = payload["result"]["tools"]
-assert any(tool["name"] == "yacli.app.snapshot" for tool in tools), payload
-assert any(tool["name"] == "yacli.mail.send" for tool in tools), payload
+assert any(tool["name"] == "yamcli.app.snapshot" for tool in tools), payload
+assert any(tool["name"] == "yamcli.mail.send" for tool in tools), payload
 PY
 
 printf '==> update check against local release mirror\n'
 target="$(current_target)"
 mirror_root="${tmp_root}/mirror"
 version="v9.9.9"
-asset_name="yacli-${target}.tar.gz"
+asset_name="yamcli-${target}.tar.gz"
 mkdir -p "${mirror_root}/releases/download/${version}"
 printf 'deadbeef  %s\n' "$asset_name" > "${mirror_root}/releases/download/${version}/SHA256SUMS"
 mirror_port="$(pick_port)"

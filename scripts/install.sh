@@ -8,14 +8,14 @@ BASE_URL=""
 
 usage() {
     cat <<'EOF'
-Install yacli from GitHub Releases.
+Install yamcli from GitHub Releases.
 
 Usage:
   install.sh [--version VERSION] [--install-dir DIR] [--base-url URL]
 
 Options:
   --version VERSION      Specific version without leading v, or "latest" (default)
-  --install-dir DIR      Destination directory for the yacli binary
+  --install-dir DIR      Destination directory for the yamcli binary
   --base-url URL         Override download base URL that serves assets and SHA256SUMS
   --help                 Show this help message
 EOF
@@ -78,7 +78,7 @@ detect_asset() {
             ;;
     esac
 
-    printf 'yacli-%s-%s.tar.gz' "$cpu" "$platform"
+    printf 'yamcli-%s-%s.tar.gz' "$cpu" "$platform"
 }
 
 checksum_cmd() {
@@ -87,7 +87,7 @@ checksum_cmd() {
     elif command -v sha256sum >/dev/null 2>&1; then
         printf '%s' "sha256sum"
     else
-        echo "Need shasum or sha256sum to verify yacli release assets." >&2
+        echo "Need shasum or sha256sum to verify yamcli release assets." >&2
         exit 1
     fi
 }
@@ -104,7 +104,7 @@ if [ -z "$BASE_URL" ]; then
     fi
 fi
 
-tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/yacli-install.XXXXXX")"
+tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/yamcli-install.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT INT TERM HUP
 
 asset_path="${tmp_dir}/${asset_name}"
@@ -130,19 +130,19 @@ fi
 mkdir -p "$INSTALL_DIR"
 tar -xzf "$asset_path" -C "$tmp_dir"
 
-binary_path="$(find "$tmp_dir" -type f -name yacli -perm -u+x | head -n 1)"
+binary_path="$(find "$tmp_dir" -type f -name yamcli -perm -u+x | head -n 1)"
 if [ -z "$binary_path" ]; then
-    echo "Could not locate yacli binary in archive ${asset_name}" >&2
+    echo "Could not locate yamcli binary in archive ${asset_name}" >&2
     exit 1
 fi
 
-cp "$binary_path" "${INSTALL_DIR}/yacli"
-chmod +x "${INSTALL_DIR}/yacli"
+cp "$binary_path" "${INSTALL_DIR}/yamcli"
+chmod +x "${INSTALL_DIR}/yamcli"
 
-echo "Installed yacli to ${INSTALL_DIR}/yacli"
+echo "Installed yamcli to ${INSTALL_DIR}/yamcli"
 case ":${PATH}:" in
     *":${INSTALL_DIR}:"*) ;;
     *)
-        echo "Add ${INSTALL_DIR} to PATH to use yacli directly."
+        echo "Add ${INSTALL_DIR} to PATH to use yamcli directly."
         ;;
 esac

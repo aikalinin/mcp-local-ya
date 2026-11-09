@@ -25,14 +25,14 @@ function Get-DefaultInstallDir {
     if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
         throw "LOCALAPPDATA is required to determine the default install directory."
     }
-    return (Join-Path $env:LOCALAPPDATA "Programs\yacli\bin")
+    return (Join-Path $env:LOCALAPPDATA "Programs\yamcli\bin")
 }
 
 function Get-AssetName {
     $arch = $env:PROCESSOR_ARCHITECTURE
     switch -Regex ($arch) {
-        "^(AMD64|x86_64)$" { return "yacli-x86_64-pc-windows-msvc.zip" }
-        default { throw "Unsupported Windows architecture for yacli install: $arch" }
+        "^(AMD64|x86_64)$" { return "yamcli-x86_64-pc-windows-msvc.zip" }
+        default { throw "Unsupported Windows architecture for yamcli install: $arch" }
     }
 }
 
@@ -52,7 +52,7 @@ $resolvedInstallDir = Get-DefaultInstallDir
 $assetName = Get-AssetName
 $downloadBaseUrl = Get-DownloadBaseUrl
 
-$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("yacli-install-" + [System.Guid]::NewGuid().ToString("N"))
+$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("yamcli-install-" + [System.Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tempDir | Out-Null
 
 try {
@@ -80,19 +80,19 @@ try {
 
     $extractDir = Join-Path $tempDir "extract"
     Expand-Archive -Path $assetPath -DestinationPath $extractDir -Force
-    $binaryPath = Get-ChildItem -Path $extractDir -Filter "yacli.exe" -Recurse | Select-Object -First 1
+    $binaryPath = Get-ChildItem -Path $extractDir -Filter "yamcli.exe" -Recurse | Select-Object -First 1
     if ($null -eq $binaryPath) {
-        throw "Could not find yacli.exe in archive $assetName"
+        throw "Could not find yamcli.exe in archive $assetName"
     }
 
     New-Item -ItemType Directory -Path $resolvedInstallDir -Force | Out-Null
-    $destination = Join-Path $resolvedInstallDir "yacli.exe"
+    $destination = Join-Path $resolvedInstallDir "yamcli.exe"
     Copy-Item -Path $binaryPath.FullName -Destination $destination -Force
 
-    Write-Host "Installed yacli to $destination"
+    Write-Host "Installed yamcli to $destination"
     $pathEntries = ($env:PATH -split ";") | ForEach-Object { $_.Trim() }
     if ($pathEntries -notcontains $resolvedInstallDir) {
-        Write-Host "Add $resolvedInstallDir to PATH to use yacli directly."
+        Write-Host "Add $resolvedInstallDir to PATH to use yamcli directly."
     }
 }
 finally {

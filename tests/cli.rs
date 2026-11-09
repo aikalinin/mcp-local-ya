@@ -6,25 +6,28 @@ use serde_json::Value;
 use std::fs;
 use tempfile::tempdir;
 
-fn yacli() -> Command {
-    let mut command = Command::cargo_bin("yacli").expect("binary exists");
-    command.env("YACLI_SECRET_BACKEND", "file");
+fn yamcli() -> Command {
+    let mut command = Command::cargo_bin("yamcli").expect("binary exists");
+    command.env("YAMCLI_SECRET_BACKEND", "file");
     command
 }
 
 fn current_release_update_target() -> (&'static str, &'static str) {
     match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("macos", "aarch64") => ("yacli-aarch64-apple-darwin.tar.gz", "aarch64-apple-darwin"),
-        ("macos", "x86_64") => ("yacli-x86_64-apple-darwin.tar.gz", "x86_64-apple-darwin"),
+        ("macos", "aarch64") => ("yamcli-aarch64-apple-darwin.tar.gz", "aarch64-apple-darwin"),
+        ("macos", "x86_64") => ("yamcli-x86_64-apple-darwin.tar.gz", "x86_64-apple-darwin"),
         ("linux", "aarch64") => (
-            "yacli-aarch64-unknown-linux-gnu.tar.gz",
+            "yamcli-aarch64-unknown-linux-gnu.tar.gz",
             "aarch64-unknown-linux-gnu",
         ),
         ("linux", "x86_64") => (
-            "yacli-x86_64-unknown-linux-gnu.tar.gz",
+            "yamcli-x86_64-unknown-linux-gnu.tar.gz",
             "x86_64-unknown-linux-gnu",
         ),
-        ("windows", "x86_64") => ("yacli-x86_64-pc-windows-msvc.zip", "x86_64-pc-windows-msvc"),
+        ("windows", "x86_64") => (
+            "yamcli-x86_64-pc-windows-msvc.zip",
+            "x86_64-pc-windows-msvc",
+        ),
         (os, arch) => panic!("unsupported published auto-update target {arch}-{os}"),
     }
 }
@@ -171,8 +174,8 @@ fn basic_auth_header(account: &str, app_password: &str) -> String {
 fn account_add_and_list_work() {
     let temp = tempdir().expect("tempdir");
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "account",
             "add",
@@ -180,14 +183,14 @@ fn account_add_and_list_work() {
             "me@yandex.ru",
             "--use",
             "--mail-credential-ref",
-            "env:YACLI_MAIL_SECRET",
+            "env:YAMCLI_MAIL_SECRET",
         ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"operation\":\"account.add\""));
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["account", "list"])
         .assert()
         .success()
@@ -206,15 +209,15 @@ fn account_add_and_list_work() {
 fn simple_add_sets_current_account_and_derived_name() {
     let temp = tempdir().expect("tempdir");
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["add", "me@yandex.ru"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"operation\":\"account.add\""));
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["whoami"])
         .assert()
         .success()
@@ -231,14 +234,14 @@ fn simple_add_sets_current_account_and_derived_name() {
 fn simple_add_respects_manual_account_name() {
     let temp = tempdir().expect("tempdir");
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["add", "me@yandex.ru", "personal"])
         .assert()
         .success();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["whoami"])
         .assert()
         .success()
@@ -253,7 +256,7 @@ fn simple_add_respects_manual_account_name() {
 
 #[test]
 fn top_level_help_hides_agent_guide_command() {
-    yacli()
+    yamcli()
         .args(["--help"])
         .assert()
         .success()
@@ -292,7 +295,7 @@ fn top_level_help_hides_agent_guide_command() {
 
 #[test]
 fn setup_help_describes_onboarding_surface() {
-    yacli()
+    yamcli()
         .args(["setup", "--help"])
         .assert()
         .success()
@@ -308,7 +311,7 @@ fn setup_help_describes_onboarding_surface() {
 
 #[test]
 fn home_help_describes_unified_surface() {
-    yacli()
+    yamcli()
         .args(["home", "--help"])
         .assert()
         .success()
@@ -321,7 +324,7 @@ fn home_help_describes_unified_surface() {
 
 #[test]
 fn doctor_help_describes_health_check_surface() {
-    yacli()
+    yamcli()
         .args(["doctor", "--help"])
         .assert()
         .success()
@@ -335,7 +338,7 @@ fn doctor_help_describes_health_check_surface() {
 
 #[test]
 fn next_help_describes_ranked_actions_surface() {
-    yacli()
+    yamcli()
         .args(["next", "--help"])
         .assert()
         .success()
@@ -348,7 +351,7 @@ fn next_help_describes_ranked_actions_surface() {
 
 #[test]
 fn goal_help_describes_router_surface() {
-    yacli()
+    yamcli()
         .args(["goal", "--help"])
         .assert()
         .success()
@@ -360,12 +363,12 @@ fn goal_help_describes_router_surface() {
 
 #[test]
 fn workflow_help_describes_hub_surface() {
-    yacli()
+    yamcli()
         .args(["workflow", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Показать готовые кросс-сервисные workflow yacli",
+            "Показать готовые кросс-сервисные workflow yamcli",
         ))
         .stdout(predicate::str::contains("list"))
         .stdout(predicate::str::contains("show"));
@@ -373,7 +376,7 @@ fn workflow_help_describes_hub_surface() {
 
 #[test]
 fn activity_help_describes_log_surface() {
-    yacli()
+    yamcli()
         .args(["activity", "--help"])
         .assert()
         .success()
@@ -386,7 +389,7 @@ fn activity_help_describes_log_surface() {
 
 #[test]
 fn workflow_list_returns_canonical_catalog() {
-    let output = yacli()
+    let output = yamcli()
         .args(["workflow", "list"])
         .assert()
         .success()
@@ -406,7 +409,7 @@ fn workflow_list_returns_canonical_catalog() {
 
 #[test]
 fn workflow_show_returns_steps_prompt_and_skill() {
-    let output = yacli()
+    let output = yamcli()
         .args(["workflow", "show", "attachment-to-disk"])
         .assert()
         .success()
@@ -419,10 +422,10 @@ fn workflow_show_returns_steps_prompt_and_skill() {
     let workflow = &value["workflow"];
     assert_eq!(workflow["id"], "attachment-to-disk");
     assert_eq!(workflow["prompt_name"], "attachment-to-disk");
-    assert_eq!(workflow["skill_name"], "yacli-attachment-to-disk");
+    assert_eq!(workflow["skill_name"], "yamcli-attachment-to-disk");
     assert_eq!(
         workflow["prompt_resource"],
-        "resource://yacli/skill/yacli-attachment-to-disk"
+        "resource://yamcli/skill/yamcli-attachment-to-disk"
     );
     assert_eq!(workflow["execution"]["state"], "needs_input");
     assert_eq!(workflow["execution"]["next_action"], "connect_services");
@@ -435,7 +438,7 @@ fn workflow_show_returns_steps_prompt_and_skill() {
 
 #[test]
 fn goal_returns_best_workflow_for_russian_invite_request() {
-    let output = yacli()
+    let output = yamcli()
         .args([
             "goal",
             "найди приглашение в письме и добавь встречу в календарь",
@@ -458,7 +461,7 @@ fn goal_returns_best_workflow_for_russian_invite_request() {
 
 #[test]
 fn goal_returns_best_workflow_for_russian_revoke_link_request() {
-    let output = yacli()
+    let output = yamcli()
         .args(["goal", "отзови публичную ссылку у файла на диске"])
         .assert()
         .success()
@@ -474,7 +477,7 @@ fn goal_returns_best_workflow_for_russian_revoke_link_request() {
 
 #[test]
 fn goal_returns_best_workflow_for_russian_publish_link_request() {
-    let output = yacli()
+    let output = yamcli()
         .args(["goal", "загрузи файл на диск и дай публичную ссылку"])
         .assert()
         .success()
@@ -490,10 +493,10 @@ fn goal_returns_best_workflow_for_russian_publish_link_request() {
 
 #[test]
 fn goal_extracts_hints_for_autofill_surface() {
-    let output = yacli()
+    let output = yamcli()
         .args([
             "goal",
-            "отправь \"Материалы ревью\" на andrei@nextstat.io файл ./review.zip через disk:/docs/review.zip в календарь team",
+            "отправь \"Материалы ревью\" на andrei@example.com файл ./review.zip через disk:/docs/review.zip в календарь team",
         ])
         .assert()
         .success()
@@ -502,7 +505,7 @@ fn goal_extracts_hints_for_autofill_surface() {
         .clone();
 
     let value: Value = serde_json::from_slice(&output).expect("valid json");
-    assert_eq!(value["hints"]["email"], "andrei@nextstat.io");
+    assert_eq!(value["hints"]["email"], "andrei@example.com");
     assert_eq!(value["hints"]["local_path"], "./review.zip");
     assert_eq!(value["hints"]["disk_path"], "disk:/docs/review.zip");
     assert_eq!(value["hints"]["quoted_text"], "Материалы ревью");
@@ -510,7 +513,7 @@ fn goal_extracts_hints_for_autofill_surface() {
     assert_eq!(value["best_match"]["workflow"]["id"], "send-link-by-mail");
     assert_eq!(
         value["best_match"]["route"]["tool_arguments"]["to"],
-        "andrei@nextstat.io"
+        "andrei@example.com"
     );
     assert_eq!(
         value["best_match"]["route"]["tool_arguments"]["source_path"],
@@ -526,8 +529,8 @@ fn goal_extracts_hints_for_autofill_surface() {
 fn goal_reports_remediation_when_product_is_not_ready() {
     let temp = tempdir().expect("tempdir");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "goal",
             "найди приглашение в письме и добавь встречу в календарь",
@@ -555,8 +558,8 @@ fn goal_reports_remediation_when_product_is_not_ready() {
 fn setup_plan_only_reports_steps_without_writing_files() {
     let temp = tempdir().expect("tempdir");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "setup",
             "me@yandex.ru",
@@ -598,8 +601,8 @@ fn setup_plan_only_reports_steps_without_writing_files() {
 fn home_without_accounts_requests_setup() {
     let temp = tempdir().expect("tempdir");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["home"])
         .assert()
         .success()
@@ -617,7 +620,7 @@ fn home_without_accounts_requests_setup() {
             .as_array()
             .expect("suggested commands")
             .iter()
-            .any(|item| item == "yacli setup me@yandex.ru")
+            .any(|item| item == "yamcli setup me@yandex.ru")
     );
 }
 
@@ -640,19 +643,19 @@ imap_host = "imap.yandex.com"
 imap_port = 993
 smtp_host = "smtp.yandex.com"
 smtp_port = 465
-credential_ref = "env:YACLI_MAIL_TOKEN"
+credential_ref = "env:YAMCLI_MAIL_TOKEN"
 
 [accounts.mock.calendar]
 enabled = true
 auth_mode = "app_password"
 caldav_base_url = "https://caldav.yandex.ru"
-credential_ref = "env:YACLI_CALENDAR_APP_PASSWORD"
+credential_ref = "env:YAMCLI_CALENDAR_APP_PASSWORD"
 
 [accounts.mock.disk]
 enabled = true
 auth_mode = "oauth"
 rest_base_url = "https://cloud-api.yandex.net"
-credential_ref = "env:YACLI_DISK_TOKEN"
+credential_ref = "env:YAMCLI_DISK_TOKEN"
 "#,
     );
     write_activity_file(
@@ -667,15 +670,15 @@ source = "cli"
 operation = "disk.upload"
 account = "mock"
 summary = "Загружен report.pdf в disk:/docs/report.pdf"
-replay_command = "yacli disk upload ./report.pdf disk:/docs/report.pdf"
+replay_command = "yamcli disk upload ./report.pdf disk:/docs/report.pdf"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MAIL_TOKEN", "mail-token")
-        .env("YACLI_CALENDAR_APP_PASSWORD", "calendar-password")
-        .env("YACLI_DISK_TOKEN", "disk-token")
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MAIL_TOKEN", "mail-token")
+        .env("YAMCLI_CALENDAR_APP_PASSWORD", "calendar-password")
+        .env("YAMCLI_DISK_TOKEN", "disk-token")
         .args(["--format", "table", "home"])
         .assert()
         .success()
@@ -689,7 +692,7 @@ replay_command = "yacli disk upload ./report.pdf disk:/docs/report.pdf"
         .stdout(predicate::str::contains("HIGHLIGHTED_WORKFLOWS"))
         .stdout(predicate::str::contains("daily-briefing"))
         .stdout(predicate::str::contains(
-            "yacli mcp install --client claude",
+            "yamcli mcp install --client claude",
         ));
 }
 
@@ -697,9 +700,9 @@ replay_command = "yacli disk upload ./report.pdf disk:/docs/report.pdf"
 fn doctor_reports_health_check_and_suggested_commands() {
     let temp = tempdir().expect("tempdir");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_SECRET_BACKEND", "file")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_SECRET_BACKEND", "file")
         .args(["doctor"])
         .assert()
         .success()
@@ -730,7 +733,7 @@ fn doctor_reports_health_check_and_suggested_commands() {
             .as_array()
             .expect("suggested commands")
             .iter()
-            .any(|item| item == "yacli setup me@yandex.ru")
+            .any(|item| item == "yamcli setup me@yandex.ru")
     );
 }
 
@@ -738,9 +741,9 @@ fn doctor_reports_health_check_and_suggested_commands() {
 fn doctor_with_goal_reports_goal_specific_remediation() {
     let temp = tempdir().expect("tempdir");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_SECRET_BACKEND", "file")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_SECRET_BACKEND", "file")
         .args([
             "doctor",
             "--goal",
@@ -773,8 +776,8 @@ fn doctor_with_goal_reports_goal_specific_remediation() {
 fn next_without_accounts_prioritizes_setup() {
     let temp = tempdir().expect("tempdir");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["next"])
         .assert()
         .success()
@@ -790,7 +793,7 @@ fn next_without_accounts_prioritizes_setup() {
             .as_array()
             .expect("actions")
             .iter()
-            .any(|item| item["command"] == "yacli setup me@yandex.ru")
+            .any(|item| item["command"] == "yamcli setup me@yandex.ru")
     );
 }
 
@@ -798,8 +801,8 @@ fn next_without_accounts_prioritizes_setup() {
 fn next_with_goal_prioritizes_goal_remediation() {
     let temp = tempdir().expect("tempdir");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "next",
             "--goal",
@@ -828,7 +831,7 @@ fn next_with_goal_prioritizes_goal_remediation() {
 
 #[test]
 fn suggest_help_describes_proactive_surface() {
-    yacli()
+    yamcli()
         .args(["suggest", "--help"])
         .assert()
         .success()
@@ -852,13 +855,13 @@ source = "cli"
 operation = "mail.send_link.partial"
 account = "mock"
 summary = "Публичная ссылка создана, но письмо не отправлено: disk:/docs/archive.zip -> https://disk.yandex.example/public"
-replay_command = "yacli mail send-published-link andrei@nextstat.io \"Материалы\" --public-url https://disk.yandex.example/public"
-undo_command = "yacli disk unpublish disk:/docs/archive.zip"
+replay_command = "yamcli mail send-published-link andrei@example.com \"Материалы\" --public-url https://disk.yandex.example/public"
+undo_command = "yamcli disk unpublish disk:/docs/archive.zip"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["suggest", "--goal", "отправь ссылку по почте"])
         .assert()
         .success()
@@ -879,7 +882,7 @@ undo_command = "yacli disk unpublish disk:/docs/archive.zip"
     );
     assert_eq!(
         value["suggestions"][0]["action"]["primary_tool"],
-        "yacli.mail.send_link"
+        "yamcli.mail.send_link"
     );
     assert_eq!(value["suggestions"][0]["action"]["supports_review"], true);
     assert_eq!(value["suggestions"][1]["kind"], "cleanup");
@@ -894,8 +897,8 @@ undo_command = "yacli disk unpublish disk:/docs/archive.zip"
 fn home_with_goal_embeds_goal_route_and_goal_aware_next_actions() {
     let temp = tempdir().expect("tempdir");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["home", "--goal", "отправь файл по почте"])
         .assert()
         .success()
@@ -934,8 +937,8 @@ fn doctor_reports_installed_claude_desktop_mcp_client() {
         &expected_config,
         r#"{
   "mcpServers": {
-    "yacli": {
-      "command": "/Users/test/.local/bin/yacli",
+    "yamcli": {
+      "command": "/Users/test/.local/bin/yamcli",
       "args": ["mcp"]
     }
   }
@@ -944,10 +947,10 @@ fn doctor_reports_installed_claude_desktop_mcp_client() {
     )
     .expect("claude desktop config");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", config_dir.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", config_dir.path())
         .env("HOME", home_dir.path())
-        .env("YACLI_SECRET_BACKEND", "file")
+        .env("YAMCLI_SECRET_BACKEND", "file")
         .args(["doctor"])
         .assert()
         .success()
@@ -979,10 +982,10 @@ fn doctor_apply_safe_installs_detected_claude_desktop_registration() {
     let expected_config = expected_claude_desktop_config_path(home_dir.path());
     fs::create_dir_all(expected_config.parent().expect("parent")).expect("create parent");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", config_dir.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", config_dir.path())
         .env("HOME", home_dir.path())
-        .env("YACLI_SECRET_BACKEND", "file")
+        .env("YAMCLI_SECRET_BACKEND", "file")
         .args(["doctor", "--apply-safe"])
         .assert()
         .success()
@@ -1016,11 +1019,11 @@ fn doctor_apply_safe_connects_calendar_from_standard_env_var() {
     let home_dir = tempdir().expect("home tempdir");
     write_mock_account_with_calendar_refs(config_dir.path(), "https://caldav.yandex.ru", None);
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", config_dir.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", config_dir.path())
         .env("HOME", home_dir.path())
-        .env("YACLI_SECRET_BACKEND", "file")
-        .env("YACLI_CALENDAR_APP_PASSWORD", "secret")
+        .env("YAMCLI_SECRET_BACKEND", "file")
+        .env("YAMCLI_CALENDAR_APP_PASSWORD", "secret")
         .args(["doctor", "--apply-safe"])
         .assert()
         .success()
@@ -1049,18 +1052,18 @@ fn doctor_apply_safe_records_activity_entry_with_replay() {
     let expected_config = expected_claude_desktop_config_path(home_dir.path());
     fs::create_dir_all(expected_config.parent().expect("parent")).expect("create parent");
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", config_dir.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", config_dir.path())
         .env("HOME", home_dir.path())
-        .env("YACLI_SECRET_BACKEND", "file")
+        .env("YAMCLI_SECRET_BACKEND", "file")
         .args(["doctor", "--apply-safe"])
         .assert()
         .success();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", config_dir.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", config_dir.path())
         .env("HOME", home_dir.path())
-        .env("YACLI_SECRET_BACKEND", "file")
+        .env("YAMCLI_SECRET_BACKEND", "file")
         .args(["activity", "list"])
         .assert()
         .success()
@@ -1073,7 +1076,7 @@ fn doctor_apply_safe_records_activity_entry_with_replay() {
     let items = value["items"].as_array().expect("activity items");
     assert_eq!(items[0]["operation"], "doctor.apply_safe");
     assert_eq!(items[0]["source"], "cli");
-    assert_eq!(items[0]["replay_command"], "yacli doctor --apply-safe");
+    assert_eq!(items[0]["replay_command"], "yamcli doctor --apply-safe");
 }
 
 #[test]
@@ -1082,16 +1085,16 @@ fn setup_skip_login_can_connect_calendar_and_install_claude_desktop() {
     let home_dir = tempdir().expect("home tempdir");
     let expected_config = expected_claude_desktop_config_path(home_dir.path());
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", config_dir.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", config_dir.path())
         .env("HOME", home_dir.path())
-        .env("YACLI_CALENDAR_APP_PASSWORD", "secret")
+        .env("YAMCLI_CALENDAR_APP_PASSWORD", "secret")
         .args([
             "setup",
             "me@yandex.ru",
             "--skip-login",
             "--calendar-env-var",
-            "YACLI_CALENDAR_APP_PASSWORD",
+            "YAMCLI_CALENDAR_APP_PASSWORD",
             "--client",
             "claude-desktop",
         ])
@@ -1133,8 +1136,8 @@ fn setup_skip_login_can_connect_calendar_and_install_claude_desktop() {
 fn setup_is_idempotent_for_existing_account() {
     let config_dir = tempdir().expect("config tempdir");
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", config_dir.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", config_dir.path())
         .args([
             "setup",
             "me@yandex.ru",
@@ -1144,8 +1147,8 @@ fn setup_is_idempotent_for_existing_account() {
         .assert()
         .success();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", config_dir.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", config_dir.path())
         .args([
             "setup",
             "me@yandex.ru",
@@ -1166,12 +1169,12 @@ fn setup_is_idempotent_for_existing_account() {
 
 #[test]
 fn update_help_describes_release_update_surface() {
-    yacli()
+    yamcli()
         .args(["update", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Обновить yacli из GitHub Releases",
+            "Обновить yamcli из GitHub Releases",
         ))
         .stdout(predicate::str::contains("--version"))
         .stdout(predicate::str::contains("--check"));
@@ -1190,7 +1193,7 @@ fn update_check_uses_release_checksum_mirror_and_reports_available_target() {
         .with_body(format!("deadbeef  {asset}\n"))
         .create();
 
-    let output = yacli()
+    let output = yamcli()
         .args(["update", "--check", "--base-url", &base_url])
         .assert()
         .success()
@@ -1210,12 +1213,12 @@ fn update_check_uses_release_checksum_mirror_and_reports_available_target() {
 
 #[test]
 fn mail_read_help_uses_positional_id() {
-    yacli()
+    yamcli()
         .args(["mail", "read", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Использование:"))
-        .stdout(predicate::str::contains("yacli mail read [OPTIONS] <ID>"))
+        .stdout(predicate::str::contains("yamcli mail read [OPTIONS] <ID>"))
         .stdout(predicate::str::contains("--uid").not())
         .stdout(predicate::str::contains("--folder <ПАПКА>"))
         .stdout(predicate::str::contains("Команды:").not())
@@ -1227,36 +1230,36 @@ fn mail_read_help_uses_positional_id() {
 
 #[test]
 fn mail_search_help_uses_positional_text() {
-    yacli()
+    yamcli()
         .args(["mail", "search", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli mail search [OPTIONS] <ТЕКСТ>",
+            "yamcli mail search [OPTIONS] <ТЕКСТ>",
         ))
         .stdout(predicate::str::contains("--query").not());
 }
 
 #[test]
 fn mail_reply_help_uses_positional_text() {
-    yacli()
+    yamcli()
         .args(["mail", "reply", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli mail reply [OPTIONS] <ID> [ТЕКСТ]",
+            "yamcli mail reply [OPTIONS] <ID> [ТЕКСТ]",
         ))
         .stdout(predicate::str::contains("--text").not());
 }
 
 #[test]
 fn mail_forward_help_uses_positional_recipient_and_text() {
-    yacli()
+    yamcli()
         .args(["mail", "forward", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli mail forward [OPTIONS] <ID> <EMAIL> [ТЕКСТ]",
+            "yamcli mail forward [OPTIONS] <ID> <EMAIL> [ТЕКСТ]",
         ))
         .stdout(predicate::str::contains("--to").not())
         .stdout(predicate::str::contains("--text").not());
@@ -1264,12 +1267,12 @@ fn mail_forward_help_uses_positional_recipient_and_text() {
 
 #[test]
 fn mail_send_help_uses_positional_recipient_subject_and_text() {
-    yacli()
+    yamcli()
         .args(["mail", "send", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli mail send [OPTIONS] <EMAIL> <ТЕМА> [ТЕКСТ]",
+            "yamcli mail send [OPTIONS] <EMAIL> <ТЕМА> [ТЕКСТ]",
         ))
         .stdout(predicate::str::contains("--attach <ФАЙЛ>"))
         .stdout(predicate::str::contains("--to").not())
@@ -1279,45 +1282,45 @@ fn mail_send_help_uses_positional_recipient_subject_and_text() {
 
 #[test]
 fn mail_send_link_help_uses_source_and_path_flags() {
-    yacli()
+    yamcli()
         .args(["mail", "send-link", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli mail send-link [OPTIONS] --source <ФАЙЛ> --path <ПУТЬ> <EMAIL> <ТЕМА> [ТЕКСТ]",
+            "yamcli mail send-link [OPTIONS] --source <ФАЙЛ> --path <ПУТЬ> <EMAIL> <ТЕМА> [ТЕКСТ]",
         ));
 }
 
 #[test]
 fn mail_send_published_link_help_uses_public_url_flag() {
-    yacli()
+    yamcli()
         .args(["mail", "send-published-link", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli mail send-published-link [OPTIONS] --public-url <URL> <EMAIL> <ТЕМА> [ТЕКСТ]",
+            "yamcli mail send-published-link [OPTIONS] --public-url <URL> <EMAIL> <ТЕМА> [ТЕКСТ]",
         ));
 }
 
 #[test]
 fn disk_upload_link_help_uses_source_and_path_flags() {
-    yacli()
+    yamcli()
         .args(["disk", "upload-link", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli disk upload-link [OPTIONS] --source <ФАЙЛ> --path <ПУТЬ>",
+            "yamcli disk upload-link [OPTIONS] --source <ФАЙЛ> --path <ПУТЬ>",
         ));
 }
 
 #[test]
 fn mail_attachment_export_help_shows_selector_flags() {
-    yacli()
+    yamcli()
         .args(["mail", "attachment", "export", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli mail attachment export [OPTIONS] --output <ФАЙЛ> <ID>",
+            "yamcli mail attachment export [OPTIONS] --output <ФАЙЛ> <ID>",
         ))
         .stdout(predicate::str::contains("--index <ЧИСЛО>"))
         .stdout(predicate::str::contains("--name <ИМЯ>"))
@@ -1326,12 +1329,12 @@ fn mail_attachment_export_help_shows_selector_flags() {
 
 #[test]
 fn mail_invite_inspect_help_shows_selector_flags() {
-    yacli()
+    yamcli()
         .args(["mail", "invite", "inspect", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli mail invite inspect [OPTIONS] <ID>",
+            "yamcli mail invite inspect [OPTIONS] <ID>",
         ))
         .stdout(predicate::str::contains("--index <ЧИСЛО>"))
         .stdout(predicate::str::contains("--name <ИМЯ>"));
@@ -1339,12 +1342,12 @@ fn mail_invite_inspect_help_shows_selector_flags() {
 
 #[test]
 fn mail_invite_create_event_help_shows_calendar_and_event_selector_flags() {
-    yacli()
+    yamcli()
         .args(["mail", "invite", "create-event", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli mail invite create-event [OPTIONS] <ID>",
+            "yamcli mail invite create-event [OPTIONS] <ID>",
         ))
         .stdout(predicate::str::contains("--index <ЧИСЛО>"))
         .stdout(predicate::str::contains("--name <ИМЯ>"))
@@ -1354,12 +1357,12 @@ fn mail_invite_create_event_help_shows_calendar_and_event_selector_flags() {
 
 #[test]
 fn calendar_events_help_uses_positional_dates() {
-    yacli()
+    yamcli()
         .args(["calendar", "events", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli calendar events [OPTIONS] [ОТ] [ДО]",
+            "yamcli calendar events [OPTIONS] [ОТ] [ДО]",
         ))
         .stdout(predicate::str::contains("--from").not())
         .stdout(predicate::str::contains("--to").not())
@@ -1368,12 +1371,12 @@ fn calendar_events_help_uses_positional_dates() {
 
 #[test]
 fn calendar_create_help_uses_positional_summary_and_dates() {
-    yacli()
+    yamcli()
         .args(["calendar", "create", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli calendar create [OPTIONS] <НАЗВАНИЕ> <НАЧАЛО> <КОНЕЦ>",
+            "yamcli calendar create [OPTIONS] <НАЗВАНИЕ> <НАЧАЛО> <КОНЕЦ>",
         ))
         .stdout(predicate::str::contains("--summary").not())
         .stdout(predicate::str::contains("--start").not())
@@ -1383,12 +1386,12 @@ fn calendar_create_help_uses_positional_summary_and_dates() {
 
 #[test]
 fn calendar_delete_help_uses_positional_id() {
-    yacli()
+    yamcli()
         .args(["calendar", "delete", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli calendar delete [OPTIONS] <ID>",
+            "yamcli calendar delete [OPTIONS] <ID>",
         ))
         .stdout(predicate::str::contains("--id").not())
         .stdout(predicate::str::contains("--uid").not());
@@ -1396,34 +1399,36 @@ fn calendar_delete_help_uses_positional_id() {
 
 #[test]
 fn disk_list_help_uses_optional_positional_path() {
-    yacli()
+    yamcli()
         .args(["disk", "list", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("yacli disk list [OPTIONS] [ПУТЬ]"))
+        .stdout(predicate::str::contains(
+            "yamcli disk list [OPTIONS] [ПУТЬ]",
+        ))
         .stdout(predicate::str::contains("--path").not());
 }
 
 #[test]
 fn disk_mkdir_help_uses_positional_path() {
-    yacli()
+    yamcli()
         .args(["disk", "mkdir", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli disk mkdir [OPTIONS] <ПУТЬ>",
+            "yamcli disk mkdir [OPTIONS] <ПУТЬ>",
         ))
         .stdout(predicate::str::contains("--path").not());
 }
 
 #[test]
 fn disk_upload_help_uses_positional_source_and_path() {
-    yacli()
+    yamcli()
         .args(["disk", "upload", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli disk upload [OPTIONS] <ФАЙЛ> <ПУТЬ>",
+            "yamcli disk upload [OPTIONS] <ФАЙЛ> <ПУТЬ>",
         ))
         .stdout(predicate::str::contains("--source").not())
         .stdout(predicate::str::contains("--path").not())
@@ -1432,12 +1437,12 @@ fn disk_upload_help_uses_positional_source_and_path() {
 
 #[test]
 fn disk_download_help_uses_positional_path_and_output_flag() {
-    yacli()
+    yamcli()
         .args(["disk", "download", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli disk download [OPTIONS] --output <ФАЙЛ> <ПУТЬ>",
+            "yamcli disk download [OPTIONS] --output <ФАЙЛ> <ПУТЬ>",
         ))
         .stdout(predicate::str::contains("--path").not())
         .stdout(predicate::str::contains("--output"));
@@ -1445,31 +1450,31 @@ fn disk_download_help_uses_positional_path_and_output_flag() {
 
 #[test]
 fn disk_publish_help_uses_positional_path() {
-    yacli()
+    yamcli()
         .args(["disk", "publish", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli disk publish [OPTIONS] <ПУТЬ>",
+            "yamcli disk publish [OPTIONS] <ПУТЬ>",
         ))
         .stdout(predicate::str::contains("--path").not());
 }
 
 #[test]
 fn disk_unpublish_help_uses_positional_path() {
-    yacli()
+    yamcli()
         .args(["disk", "unpublish", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "yacli disk unpublish [OPTIONS] <ПУТЬ>",
+            "yamcli disk unpublish [OPTIONS] <ПУТЬ>",
         ))
         .stdout(predicate::str::contains("--path").not());
 }
 
 #[test]
 fn guide_lists_stable_commands_and_workflows() {
-    let output = yacli()
+    let output = yamcli()
         .args(["guide"])
         .assert()
         .success()
@@ -1614,7 +1619,7 @@ fn guide_lists_stable_commands_and_workflows() {
 
 #[test]
 fn guide_topic_mail_filters_to_mail_commands() {
-    let output = yacli()
+    let output = yamcli()
         .args(["guide", "--topic", "mail"])
         .assert()
         .success()
@@ -1691,7 +1696,7 @@ fn guide_topic_mail_filters_to_mail_commands() {
 
 #[test]
 fn guide_topic_auth_filters_to_simple_login_commands() {
-    let output = yacli()
+    let output = yamcli()
         .args(["guide", "--topic", "auth"])
         .assert()
         .success()
@@ -1717,7 +1722,7 @@ fn guide_topic_auth_filters_to_simple_login_commands() {
 
 #[test]
 fn guide_topic_calendar_filters_to_calendar_commands() {
-    let output = yacli()
+    let output = yamcli()
         .args(["guide", "--topic", "calendar"])
         .assert()
         .success()
@@ -1768,7 +1773,7 @@ fn guide_topic_calendar_filters_to_calendar_commands() {
 
 #[test]
 fn guide_topic_disk_filters_to_disk_commands() {
-    let output = yacli()
+    let output = yamcli()
         .args(["guide", "--topic", "disk"])
         .assert()
         .success()
@@ -1821,21 +1826,21 @@ fn account_use_switches_current_account() {
     let temp = tempdir().expect("tempdir");
 
     for name in ["personal", "work"] {
-        yacli()
-            .env("YACLI_CONFIG_DIR", temp.path())
+        yamcli()
+            .env("YAMCLI_CONFIG_DIR", temp.path())
             .args(["account", "add", name, "me@yandex.ru"])
             .assert()
             .success();
     }
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["account", "use", "work"])
         .assert()
         .success();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["account", "current"])
         .assert()
         .success()
@@ -1880,8 +1885,8 @@ rest_base_url = "https://cloud-api.yandex.net"
 "#,
     );
 
-    let list_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let list_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["account", "list"])
         .assert()
         .success()
@@ -1893,8 +1898,8 @@ rest_base_url = "https://cloud-api.yandex.net"
     assert_eq!(list["items"][0]["name"], "single");
     assert_eq!(list["items"][0]["current"], true);
 
-    let current_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let current_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["account", "current"])
         .assert()
         .success()
@@ -1911,8 +1916,8 @@ rest_base_url = "https://cloud-api.yandex.net"
 fn validate_reports_invalid_account() {
     let temp = tempdir().expect("tempdir");
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["account", "add", "broken", "not-an-email"])
         .assert()
         .failure()
@@ -1923,8 +1928,8 @@ fn validate_reports_invalid_account() {
 fn auth_status_reports_missing_and_present_env_refs() {
     let temp = tempdir().expect("tempdir");
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "account",
             "add",
@@ -1932,16 +1937,16 @@ fn auth_status_reports_missing_and_present_env_refs() {
             "me@yandex.ru",
             "--use",
             "--mail-credential-ref",
-            "env:YACLI_MAIL_SECRET",
+            "env:YAMCLI_MAIL_SECRET",
             "--calendar-credential-ref",
-            "env:YACLI_CALENDAR_SECRET",
+            "env:YAMCLI_CALENDAR_SECRET",
         ])
         .assert()
         .success();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MAIL_SECRET", "ready")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MAIL_SECRET", "ready")
         .args(["auth", "status"])
         .assert()
         .success()
@@ -1965,8 +1970,8 @@ fn auth_status_reports_missing_and_present_env_refs() {
 fn status_table_uses_russian_labels_for_people() {
     let temp = tempdir().expect("tempdir");
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "account",
             "add",
@@ -1974,14 +1979,14 @@ fn status_table_uses_russian_labels_for_people() {
             "me@yandex.ru",
             "--use",
             "--mail-credential-ref",
-            "env:YACLI_MAIL_SECRET",
+            "env:YAMCLI_MAIL_SECRET",
         ])
         .assert()
         .success();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_MAIL_SECRET", "ready")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_MAIL_SECRET", "ready")
         .args(["--format", "table", "status"])
         .assert()
         .success()
@@ -1992,7 +1997,7 @@ fn status_table_uses_russian_labels_for_people() {
     let table = String::from_utf8(output).expect("utf8");
     assert!(table.contains("СЛУЖБА\tСТАТУС\tПОДРОБНОСТИ"));
     assert!(
-        table.contains("Почта\tПодключено\tиспользуется переменная окружения YACLI_MAIL_SECRET")
+        table.contains("Почта\tПодключено\tиспользуется переменная окружения YAMCLI_MAIL_SECRET")
     );
     assert!(table.contains("Календарь\tНе подключено\tслужба еще не подключена"));
     assert!(table.contains("Диск\tНе подключено\tслужба еще не подключена"));
@@ -2024,9 +2029,9 @@ fn auth_login_stores_disk_token_and_updates_account_ref() {
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_OAUTH_BASE_URL", oauth.url())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_OAUTH_BASE_URL", oauth.url())
         .args([
             "auth",
             "login",
@@ -2106,9 +2111,9 @@ fn simple_login_uses_builtin_client_and_connects_mail_and_disk() {
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_OAUTH_BASE_URL", oauth.url())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_OAUTH_BASE_URL", oauth.url())
         .args(["login", "--code", "confirm-123"])
         .assert()
         .success()
@@ -2147,8 +2152,8 @@ fn login_without_code_returns_pending_session_for_agents() {
         None,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["login"])
         .assert()
         .success()
@@ -2172,7 +2177,7 @@ fn login_without_code_returns_pending_session_for_agents() {
         value["resume_command"]
             .as_str()
             .expect("resume command")
-            .contains("yacli login --account 'mock' --code <код>")
+            .contains("yamcli login --account 'mock' --code <код>")
     );
 
     let pending = read_oauth_sessions_file(temp.path());
@@ -2194,9 +2199,9 @@ fn login_with_code_reuses_pending_session_and_clears_it() {
         None,
     );
 
-    let pending_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_OAUTH_BASE_URL", oauth.url())
+    let pending_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_OAUTH_BASE_URL", oauth.url())
         .args(["login"])
         .assert()
         .success()
@@ -2234,9 +2239,9 @@ fn login_with_code_reuses_pending_session_and_clears_it() {
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_OAUTH_BASE_URL", oauth.url())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_OAUTH_BASE_URL", oauth.url())
         .args(["login", "--code", "confirm-123"])
         .assert()
         .success()
@@ -2255,8 +2260,8 @@ fn login_with_code_reuses_pending_session_and_clears_it() {
 fn setup_surfaces_pending_mail_disk_login_for_agents() {
     let config_dir = tempdir().expect("config tempdir");
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", config_dir.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", config_dir.path())
         .args(["setup", "me@yandex.ru", "--skip-mcp-install"])
         .assert()
         .success()
@@ -2282,7 +2287,7 @@ fn setup_surfaces_pending_mail_disk_login_for_agents() {
             .any(|item| item
                 .as_str()
                 .unwrap_or_default()
-                .contains("yacli login --account <аккаунт> --code <код>"))
+                .contains("yamcli login --account <аккаунт> --code <код>"))
     );
     assert!(config_dir.path().join("oauth_sessions.toml").exists());
 }
@@ -2318,9 +2323,9 @@ fn auth_login_stores_mail_token_and_updates_account_ref() {
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_OAUTH_BASE_URL", oauth.url())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_OAUTH_BASE_URL", oauth.url())
         .args([
             "auth",
             "login",
@@ -2365,8 +2370,8 @@ fn simple_login_with_app_password_defaults_to_calendar() {
 
     write_mock_account_with_calendar_refs(temp.path(), "https://caldav.yandex.ru", None);
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["login", "--app-password", "calendar-secret"])
         .assert()
         .success()
@@ -2387,8 +2392,8 @@ fn auth_login_sets_calendar_env_ref_without_touching_credentials_store() {
 
     write_mock_account_with_calendar_refs(temp.path(), "https://caldav.yandex.ru", None);
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "auth",
             "login",
@@ -2397,7 +2402,7 @@ fn auth_login_sets_calendar_env_ref_without_touching_credentials_store() {
             "--service",
             "calendar",
             "--env-var",
-            "YACLI_CALENDAR_APP_PASSWORD",
+            "YAMCLI_CALENDAR_APP_PASSWORD",
         ])
         .assert()
         .success()
@@ -2408,11 +2413,11 @@ fn auth_login_sets_calendar_env_ref_without_touching_credentials_store() {
     let value: Value = serde_json::from_slice(&output).expect("valid json");
     assert_eq!(value["operation"], "auth.login");
     assert_eq!(value["service"], "calendar");
-    assert_eq!(value["credential_ref"], "env:YACLI_CALENDAR_APP_PASSWORD");
+    assert_eq!(value["credential_ref"], "env:YAMCLI_CALENDAR_APP_PASSWORD");
     assert_eq!(value["mode"], "app_password_env");
 
     let accounts = fs::read_to_string(temp.path().join("accounts.toml")).expect("accounts");
-    assert!(accounts.contains("credential_ref = \"env:YACLI_CALENDAR_APP_PASSWORD\""));
+    assert!(accounts.contains("credential_ref = \"env:YAMCLI_CALENDAR_APP_PASSWORD\""));
     assert!(!temp.path().join("credentials.toml").exists());
 }
 
@@ -2422,8 +2427,8 @@ fn auth_login_stores_calendar_app_password_and_updates_account_ref() {
 
     write_mock_account_with_calendar_refs(temp.path(), "https://caldav.yandex.ru", None);
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "auth",
             "login",
@@ -2461,14 +2466,14 @@ fn mail_oauth_tokens_are_isolated_per_account() {
     let temp = tempdir().expect("tempdir");
     let mut oauth = Server::new();
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["account", "add", "personal", "personal@yandex.ru", "--use"])
         .assert()
         .success();
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["account", "add", "work", "work@company.ru"])
         .assert()
         .success();
@@ -2509,9 +2514,9 @@ fn mail_oauth_tokens_are_isolated_per_account() {
         )
         .create();
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_OAUTH_BASE_URL", oauth.url())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_OAUTH_BASE_URL", oauth.url())
         .args([
             "auth",
             "login",
@@ -2527,9 +2532,9 @@ fn mail_oauth_tokens_are_isolated_per_account() {
         .assert()
         .success();
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_OAUTH_BASE_URL", oauth.url())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_OAUTH_BASE_URL", oauth.url())
         .args([
             "auth",
             "login",
@@ -2637,8 +2642,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "auth",
             "logout",
@@ -2673,12 +2678,12 @@ fn auth_login_rejects_mail_oauth_when_account_uses_app_password() {
         temp.path(),
         "https://cloud-api.yandex.net",
         "app_password",
-        Some("env:YACLI_MAIL_APP_PASSWORD"),
+        Some("env:YAMCLI_MAIL_APP_PASSWORD"),
         None,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "auth",
             "login",
@@ -2725,8 +2730,8 @@ client_id = "client-123"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["auth", "status", "--account", "mock"])
         .assert()
         .success()
@@ -2762,8 +2767,8 @@ secret = "calendar-secret"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["auth", "status", "--account", "mock"])
         .assert()
         .success()
@@ -2816,8 +2821,8 @@ client_id = "client-123"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["auth", "logout", "--account", "mock", "--service", "mail"])
         .assert()
         .success()
@@ -2864,8 +2869,8 @@ client_id = "client-123"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["auth", "logout", "--account", "mock", "--service", "disk"])
         .assert()
         .success()
@@ -2893,11 +2898,11 @@ fn auth_logout_clears_calendar_env_ref_without_credentials_store() {
     write_mock_account_with_calendar_refs(
         temp.path(),
         "https://caldav.yandex.ru",
-        Some("env:YACLI_CALENDAR_APP_PASSWORD"),
+        Some("env:YAMCLI_CALENDAR_APP_PASSWORD"),
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "auth",
             "logout",
@@ -2918,7 +2923,7 @@ fn auth_logout_clears_calendar_env_ref_without_credentials_store() {
     assert_eq!(value["cleared_account_ref"], true);
 
     let accounts = fs::read_to_string(temp.path().join("accounts.toml")).expect("accounts");
-    assert!(!accounts.contains("credential_ref = \"env:YACLI_CALENDAR_APP_PASSWORD\""));
+    assert!(!accounts.contains("credential_ref = \"env:YAMCLI_CALENDAR_APP_PASSWORD\""));
     assert!(!temp.path().join("credentials.toml").exists());
 }
 
@@ -2942,8 +2947,8 @@ secret = "calendar-secret"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "auth",
             "logout",
@@ -2997,8 +3002,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "folders", "--account", "mock"])
         .assert()
         .failure()
@@ -3032,8 +3037,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "list", "--account", "mock"])
         .assert()
         .failure()
@@ -3067,8 +3072,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "read", "--account", "mock", "42"])
         .assert()
         .failure()
@@ -3102,8 +3107,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "list", "--account", "mock", "--limit", "0"])
         .assert()
         .failure()
@@ -3139,8 +3144,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "search", "--account", "mock", "Budget"])
         .assert()
         .failure()
@@ -3174,8 +3179,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "search",
@@ -3219,8 +3224,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "search", "--account", "mock", "   "])
         .assert()
         .failure()
@@ -3256,8 +3261,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "reply", "--account", "mock", "42", "Принято"])
         .assert()
         .failure()
@@ -3291,8 +3296,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "reply", "--account", "mock", "0", "Принято"])
         .assert()
         .failure()
@@ -3328,8 +3333,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "reply", "--account", "mock", "42"])
         .assert()
         .failure()
@@ -3365,8 +3370,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "forward",
@@ -3408,8 +3413,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "forward",
@@ -3452,8 +3457,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "forward",
@@ -3498,8 +3503,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "forward",
@@ -3542,8 +3547,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "read", "--account", "mock", "0"])
         .assert()
         .failure()
@@ -3579,8 +3584,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "read",
@@ -3624,8 +3629,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "attachment",
@@ -3670,8 +3675,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "attachment",
@@ -3718,8 +3723,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "attachment",
@@ -3768,8 +3773,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "invite", "inspect", "--account", "mock", "42"])
         .assert()
         .failure()
@@ -3805,8 +3810,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["mail", "invite", "create-event", "--account", "mock", "42"])
         .assert()
         .failure()
@@ -3842,8 +3847,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "invite",
@@ -3891,8 +3896,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "send",
@@ -3936,8 +3941,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "send",
@@ -3983,8 +3988,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "send",
@@ -4046,8 +4051,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "send-link",
@@ -4105,8 +4110,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "send",
@@ -4160,8 +4165,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "send",
@@ -4297,8 +4302,8 @@ client_id = "client-123"
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "send-link",
@@ -4329,15 +4334,15 @@ client_id = "client-123"
     );
     assert_eq!(
         value["partial"]["recovery"]["retry_mail_step"]["tool"],
-        "yacli.mail.send_published_link"
+        "yamcli.mail.send_published_link"
     );
     assert_eq!(
         value["partial"]["recovery"]["cleanup_public_link"]["tool"],
-        "yacli.disk.unpublish"
+        "yamcli.disk.unpublish"
     );
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -4381,8 +4386,8 @@ client_id = "client-123"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "send-published-link",
@@ -4439,8 +4444,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "mail",
             "send",
@@ -4568,8 +4573,8 @@ secret = "calendar-secret"
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["calendar", "calendars", "--account", "mock"])
         .assert()
         .success()
@@ -4707,8 +4712,8 @@ END:VCALENDAR]]></c:calendar-data>
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "calendar",
             "events",
@@ -4890,8 +4895,8 @@ END:VCALENDAR]]></c:calendar-data>
         })
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "calendar",
             "create",
@@ -4922,7 +4927,7 @@ END:VCALENDAR]]></c:calendar-data>
         value["event"]["id"]
             .as_str()
             .expect("id")
-            .starts_with("yacli-")
+            .starts_with("yamcli-")
     );
     assert_eq!(
         value["event"]["href"],
@@ -5017,8 +5022,8 @@ secret = "calendar-secret"
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "calendar",
             "create",
@@ -5177,8 +5182,8 @@ END:VCALENDAR]]></c:calendar-data>
         .with_status(204)
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["calendar", "delete", "--account", "mock", "event-1"])
         .assert()
         .success()
@@ -5204,11 +5209,11 @@ fn calendar_events_rejects_zero_limit() {
     write_mock_account_with_calendar_refs(
         temp.path(),
         "https://caldav.yandex.ru",
-        Some("env:YACLI_CALENDAR_APP_PASSWORD"),
+        Some("env:YAMCLI_CALENDAR_APP_PASSWORD"),
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["calendar", "events", "--account", "mock", "--limit", "0"])
         .assert()
         .failure()
@@ -5239,8 +5244,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["disk", "info", "--account", "mock"])
         .assert()
         .failure()
@@ -5269,8 +5274,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["disk", "list", "--account", "mock"])
         .assert()
         .failure()
@@ -5299,8 +5304,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["disk", "list", "--account", "mock", "--limit", "0"])
         .assert()
         .failure()
@@ -5376,8 +5381,8 @@ client_id = "client-123"
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "list",
@@ -5434,8 +5439,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["disk", "mkdir", "--account", "mock", "disk:/docs"])
         .assert()
         .failure()
@@ -5464,8 +5469,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["disk", "mkdir", "--account", "mock", ""])
         .assert()
         .failure()
@@ -5534,8 +5539,8 @@ client_id = "client-123"
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "mkdir",
@@ -5579,8 +5584,8 @@ client_id = "client-123"
 "#,
     );
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "upload",
@@ -5670,8 +5675,8 @@ client_id = "client-123"
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "upload",
@@ -5724,8 +5729,8 @@ client_id = "client-123"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "upload",
@@ -5748,8 +5753,8 @@ client_id = "client-123"
     assert_eq!(value["upload"]["remote_path"], "disk:/docs/note.txt");
     assert_eq!(value["upload"]["bytes_written"], 10);
 
-    let activity = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list"])
         .assert()
         .success()
@@ -5786,8 +5791,8 @@ client_id = "client-123"
 "#,
     );
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "upload-link",
@@ -5814,8 +5819,8 @@ client_id = "client-123"
     );
     assert_eq!(value["review"]["publish_path"], "disk:/docs/note.txt");
 
-    let activity = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list"])
         .assert()
         .success()
@@ -5913,8 +5918,8 @@ client_id = "client-123"
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "upload-link",
@@ -5939,8 +5944,8 @@ client_id = "client-123"
         Some("https://disk.yandex.ru/i/public-note")
     );
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -6026,8 +6031,8 @@ client_id = "client-123"
         )
         .create();
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "upload",
@@ -6039,8 +6044,8 @@ client_id = "client-123"
         .assert()
         .success();
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -6067,8 +6072,8 @@ client_id = "client-123"
     );
 
     let entry_id = items[0]["id"].as_str().expect("entry id");
-    let show_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let show_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "show", entry_id])
         .assert()
         .success()
@@ -6125,8 +6130,8 @@ fn disk_public_show_returns_resource_metadata() {
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "public",
@@ -6178,8 +6183,8 @@ fn disk_public_show_surfaces_provider_errors() {
         )
         .create();
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "public",
@@ -6266,8 +6271,8 @@ rest_base_url = "{}"
         .with_body(body.as_slice())
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "public",
@@ -6307,8 +6312,8 @@ rest_base_url = "{}"
     assert_eq!(value["download"]["resumed_from_bytes"].as_u64(), Some(0));
     assert_eq!(value["download"]["attempts"].as_u64(), Some(1));
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -6327,7 +6332,7 @@ rest_base_url = "{}"
             .contains("попыток: 1")
     );
     let replay = items[0]["replay_command"].as_str().expect("replay command");
-    assert!(replay.contains("yacli disk public download"));
+    assert!(replay.contains("yamcli disk public download"));
     assert!(replay.contains("--public-key"));
     assert!(replay.contains("--output"));
 }
@@ -6405,9 +6410,9 @@ client_id = "client-123"
         .with_body(body.as_slice())
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_DISK_TOKEN", "disk-token")
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_DISK_TOKEN", "disk-token")
         .args([
             "disk",
             "download",
@@ -6436,9 +6441,9 @@ client_id = "client-123"
         body.as_slice()
     );
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
-        .env("YACLI_DISK_TOKEN", "disk-token")
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .env("YAMCLI_DISK_TOKEN", "disk-token")
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -6454,7 +6459,7 @@ client_id = "client-123"
         items[0]["replay_command"]
             .as_str()
             .expect("replay command")
-            .contains("yacli disk download")
+            .contains("yamcli disk download")
     );
 }
 
@@ -6507,8 +6512,8 @@ client_id = "client-123"
         .expect(1)
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "publish",
@@ -6532,8 +6537,8 @@ client_id = "client-123"
         Some("https://disk.yandex.ru/i/public-report")
     );
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -6604,8 +6609,8 @@ client_id = "client-123"
         )
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "publish",
@@ -6630,8 +6635,8 @@ client_id = "client-123"
         Some("public-key-report")
     );
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -6647,13 +6652,13 @@ client_id = "client-123"
         items[0]["undo_command"]
             .as_str()
             .expect("undo command")
-            .contains("yacli disk unpublish")
+            .contains("yamcli disk unpublish")
     );
     assert!(
         items[0]["replay_command"]
             .as_str()
             .expect("replay command")
-            .contains("yacli disk publish")
+            .contains("yamcli disk publish")
     );
 }
 
@@ -6755,8 +6760,8 @@ client_id = "client-123"
         )
         .create();
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "publish",
@@ -6767,8 +6772,8 @@ client_id = "client-123"
         .assert()
         .success();
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -6781,8 +6786,8 @@ client_id = "client-123"
         .expect("activity id")
         .to_string();
 
-    let undo_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let undo_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "undo", &activity_id])
         .assert()
         .success()
@@ -6797,8 +6802,8 @@ client_id = "client-123"
         "https://disk.yandex.ru/i/public-report"
     );
 
-    let activity_after_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity_after_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -6861,8 +6866,8 @@ client_id = "client-123"
         .expect(1)
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "unpublish",
@@ -6886,8 +6891,8 @@ client_id = "client-123"
         Some("https://disk.yandex.ru/i/public-report")
     );
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -6985,8 +6990,8 @@ client_id = "client-123"
         .expect(1)
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "unpublish",
@@ -7010,8 +7015,8 @@ client_id = "client-123"
     assert_eq!(value["result"]["resource"]["public_url"], Value::Null);
     assert_eq!(value["result"]["resource"]["public_key"], Value::Null);
 
-    let activity_output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let activity_output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args(["activity", "list", "--limit", "10"])
         .assert()
         .success()
@@ -7026,7 +7031,7 @@ client_id = "client-123"
         items[0]["replay_command"]
             .as_str()
             .expect("replay command")
-            .contains("yacli disk unpublish")
+            .contains("yamcli disk unpublish")
     );
 }
 
@@ -7110,8 +7115,8 @@ rest_base_url = "{}"
         .with_body(&body[partial_len..])
         .create();
 
-    let output = yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    let output = yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "public",
@@ -7204,8 +7209,8 @@ rest_base_url = "{}"
         ))
         .create();
 
-    yacli()
-        .env("YACLI_CONFIG_DIR", temp.path())
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
         .args([
             "disk",
             "public",

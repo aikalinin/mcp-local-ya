@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 
 struct Skill {
     name: &'static str,
@@ -10,56 +10,56 @@ struct Skill {
 
 const SKILLS: &[Skill] = &[
     Skill {
-        name: "yacli-shared",
-        content: include_str!("../../skills/yacli-shared/SKILL.md"),
+        name: "yamcli-shared",
+        content: include_str!("../../skills/yamcli-shared/SKILL.md"),
     },
     Skill {
-        name: "yacli-mail",
-        content: include_str!("../../skills/yacli-mail/SKILL.md"),
+        name: "yamcli-mail",
+        content: include_str!("../../skills/yamcli-mail/SKILL.md"),
     },
     Skill {
-        name: "yacli-calendar",
-        content: include_str!("../../skills/yacli-calendar/SKILL.md"),
+        name: "yamcli-calendar",
+        content: include_str!("../../skills/yamcli-calendar/SKILL.md"),
     },
     Skill {
-        name: "yacli-disk",
-        content: include_str!("../../skills/yacli-disk/SKILL.md"),
+        name: "yamcli-disk",
+        content: include_str!("../../skills/yamcli-disk/SKILL.md"),
     },
     Skill {
-        name: "yacli-daily-briefing",
-        content: include_str!("../../skills/yacli-daily-briefing/SKILL.md"),
+        name: "yamcli-daily-briefing",
+        content: include_str!("../../skills/yamcli-daily-briefing/SKILL.md"),
     },
     Skill {
-        name: "yacli-find-and-read",
-        content: include_str!("../../skills/yacli-find-and-read/SKILL.md"),
+        name: "yamcli-find-and-read",
+        content: include_str!("../../skills/yamcli-find-and-read/SKILL.md"),
     },
     Skill {
-        name: "yacli-reply-with-context",
-        content: include_str!("../../skills/yacli-reply-with-context/SKILL.md"),
+        name: "yamcli-reply-with-context",
+        content: include_str!("../../skills/yamcli-reply-with-context/SKILL.md"),
     },
     Skill {
-        name: "yacli-attachment-to-disk",
-        content: include_str!("../../skills/yacli-attachment-to-disk/SKILL.md"),
+        name: "yamcli-attachment-to-disk",
+        content: include_str!("../../skills/yamcli-attachment-to-disk/SKILL.md"),
     },
     Skill {
-        name: "yacli-send-file-by-mail",
-        content: include_str!("../../skills/yacli-send-file-by-mail/SKILL.md"),
+        name: "yamcli-send-file-by-mail",
+        content: include_str!("../../skills/yamcli-send-file-by-mail/SKILL.md"),
     },
     Skill {
-        name: "yacli-send-link-by-mail",
-        content: include_str!("../../skills/yacli-send-link-by-mail/SKILL.md"),
+        name: "yamcli-send-link-by-mail",
+        content: include_str!("../../skills/yamcli-send-link-by-mail/SKILL.md"),
     },
     Skill {
-        name: "yacli-publish-file-link",
-        content: include_str!("../../skills/yacli-publish-file-link/SKILL.md"),
+        name: "yamcli-publish-file-link",
+        content: include_str!("../../skills/yamcli-publish-file-link/SKILL.md"),
     },
     Skill {
-        name: "yacli-revoke-public-link",
-        content: include_str!("../../skills/yacli-revoke-public-link/SKILL.md"),
+        name: "yamcli-revoke-public-link",
+        content: include_str!("../../skills/yamcli-revoke-public-link/SKILL.md"),
     },
     Skill {
-        name: "yacli-invite-to-calendar",
-        content: include_str!("../../skills/yacli-invite-to-calendar/SKILL.md"),
+        name: "yamcli-invite-to-calendar",
+        content: include_str!("../../skills/yamcli-invite-to-calendar/SKILL.md"),
     },
 ];
 
@@ -83,19 +83,19 @@ pub fn skill_description(name: &str) -> Option<String> {
 
 pub fn skill_prompt_name(name: &str) -> Option<&'static str> {
     match name {
-        "yacli-shared" => Some("shared"),
-        "yacli-mail" => Some("mail"),
-        "yacli-calendar" => Some("calendar"),
-        "yacli-disk" => Some("disk"),
-        "yacli-daily-briefing" => Some("daily-briefing"),
-        "yacli-find-and-read" => Some("find-and-read"),
-        "yacli-reply-with-context" => Some("reply-with-context"),
-        "yacli-attachment-to-disk" => Some("attachment-to-disk"),
-        "yacli-send-file-by-mail" => Some("send-file-by-mail"),
-        "yacli-send-link-by-mail" => Some("send-link-by-mail"),
-        "yacli-publish-file-link" => Some("publish-file-link"),
-        "yacli-revoke-public-link" => Some("revoke-public-link"),
-        "yacli-invite-to-calendar" => Some("invite-to-calendar"),
+        "yamcli-shared" => Some("shared"),
+        "yamcli-mail" => Some("mail"),
+        "yamcli-calendar" => Some("calendar"),
+        "yamcli-disk" => Some("disk"),
+        "yamcli-daily-briefing" => Some("daily-briefing"),
+        "yamcli-find-and-read" => Some("find-and-read"),
+        "yamcli-reply-with-context" => Some("reply-with-context"),
+        "yamcli-attachment-to-disk" => Some("attachment-to-disk"),
+        "yamcli-send-file-by-mail" => Some("send-file-by-mail"),
+        "yamcli-send-link-by-mail" => Some("send-link-by-mail"),
+        "yamcli-publish-file-link" => Some("publish-file-link"),
+        "yamcli-revoke-public-link" => Some("revoke-public-link"),
+        "yamcli-invite-to-calendar" => Some("invite-to-calendar"),
         _ => None,
     }
 }
@@ -112,14 +112,14 @@ pub fn install_skills(target_dir: &Path) -> Result<usize> {
     for skill in SKILLS {
         let skill_dir = target_dir.join(skill.name);
         fs::create_dir_all(&skill_dir).map_err(|err| {
-            YacliError::Io(format!(
+            YamcliError::Io(format!(
                 "failed to create skill directory {}: {err}",
                 skill_dir.display()
             ))
         })?;
         let skill_path = skill_dir.join("SKILL.md");
         fs::write(&skill_path, skill.content).map_err(|err| {
-            YacliError::Io(format!(
+            YamcliError::Io(format!(
                 "failed to write skill {}: {err}",
                 skill_path.display()
             ))
@@ -154,19 +154,19 @@ mod tests {
     fn skill_names_returns_all_names() {
         let names = skill_names();
         assert_eq!(names.len(), SKILL_COUNT);
-        assert!(names.contains(&"yacli-shared"));
-        assert!(names.contains(&"yacli-mail"));
-        assert!(names.contains(&"yacli-calendar"));
-        assert!(names.contains(&"yacli-disk"));
-        assert!(names.contains(&"yacli-daily-briefing"));
-        assert!(names.contains(&"yacli-find-and-read"));
-        assert!(names.contains(&"yacli-reply-with-context"));
-        assert!(names.contains(&"yacli-attachment-to-disk"));
-        assert!(names.contains(&"yacli-send-file-by-mail"));
-        assert!(names.contains(&"yacli-send-link-by-mail"));
-        assert!(names.contains(&"yacli-publish-file-link"));
-        assert!(names.contains(&"yacli-revoke-public-link"));
-        assert!(names.contains(&"yacli-invite-to-calendar"));
+        assert!(names.contains(&"yamcli-shared"));
+        assert!(names.contains(&"yamcli-mail"));
+        assert!(names.contains(&"yamcli-calendar"));
+        assert!(names.contains(&"yamcli-disk"));
+        assert!(names.contains(&"yamcli-daily-briefing"));
+        assert!(names.contains(&"yamcli-find-and-read"));
+        assert!(names.contains(&"yamcli-reply-with-context"));
+        assert!(names.contains(&"yamcli-attachment-to-disk"));
+        assert!(names.contains(&"yamcli-send-file-by-mail"));
+        assert!(names.contains(&"yamcli-send-link-by-mail"));
+        assert!(names.contains(&"yamcli-publish-file-link"));
+        assert!(names.contains(&"yamcli-revoke-public-link"));
+        assert!(names.contains(&"yamcli-invite-to-calendar"));
     }
 
     #[test]
@@ -290,59 +290,59 @@ mod tests {
 
     #[test]
     fn skill_content_and_description_are_available() {
-        let content = skill_content("yacli-mail").expect("skill content");
-        assert!(content.contains("# yacli mail"));
+        let content = skill_content("yamcli-mail").expect("skill content");
+        assert!(content.contains("# yamcli mail"));
 
-        let description = skill_description("yacli-mail").expect("skill description");
+        let description = skill_description("yamcli-mail").expect("skill description");
         assert!(description.contains("Яндекс Почта"));
     }
 
     #[test]
     fn prompt_and_skill_name_mapping_is_bidirectional() {
-        assert_eq!(prompt_skill_name("mail"), Some("yacli-mail"));
+        assert_eq!(prompt_skill_name("mail"), Some("yamcli-mail"));
         assert_eq!(
             prompt_skill_name("daily-briefing"),
-            Some("yacli-daily-briefing")
+            Some("yamcli-daily-briefing")
         );
-        assert_eq!(skill_prompt_name("yacli-shared"), Some("shared"));
+        assert_eq!(skill_prompt_name("yamcli-shared"), Some("shared"));
         assert_eq!(
-            skill_prompt_name("yacli-reply-with-context"),
+            skill_prompt_name("yamcli-reply-with-context"),
             Some("reply-with-context")
         );
         assert_eq!(
             prompt_skill_name("attachment-to-disk"),
-            Some("yacli-attachment-to-disk")
+            Some("yamcli-attachment-to-disk")
         );
         assert_eq!(
-            skill_prompt_name("yacli-send-file-by-mail"),
+            skill_prompt_name("yamcli-send-file-by-mail"),
             Some("send-file-by-mail")
         );
         assert_eq!(
             prompt_skill_name("send-link-by-mail"),
-            Some("yacli-send-link-by-mail")
+            Some("yamcli-send-link-by-mail")
         );
         assert_eq!(
             prompt_skill_name("publish-file-link"),
-            Some("yacli-publish-file-link")
+            Some("yamcli-publish-file-link")
         );
         assert_eq!(
             prompt_skill_name("revoke-public-link"),
-            Some("yacli-revoke-public-link")
+            Some("yamcli-revoke-public-link")
         );
         assert_eq!(
             prompt_skill_name("invite-to-calendar"),
-            Some("yacli-invite-to-calendar")
+            Some("yamcli-invite-to-calendar")
         );
         assert_eq!(
-            skill_prompt_name("yacli-publish-file-link"),
+            skill_prompt_name("yamcli-publish-file-link"),
             Some("publish-file-link")
         );
         assert_eq!(
-            skill_prompt_name("yacli-revoke-public-link"),
+            skill_prompt_name("yamcli-revoke-public-link"),
             Some("revoke-public-link")
         );
         assert_eq!(
-            skill_prompt_name("yacli-invite-to-calendar"),
+            skill_prompt_name("yamcli-invite-to-calendar"),
             Some("invite-to-calendar")
         );
     }

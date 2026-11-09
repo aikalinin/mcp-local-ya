@@ -195,7 +195,7 @@ pub fn goal_route_payload(query: &str, account: Option<&str>) -> Result<Value> {
         .as_ref()
         .and_then(|item| item["route"]["workflow_command"].as_str())
         .map(ToString::to_string)
-        .unwrap_or_else(|| "yacli workflow list".to_string());
+        .unwrap_or_else(|| "yamcli workflow list".to_string());
     let remediation = remediation_payload(best_match.as_ref(), &onboarding, &doctor);
 
     Ok(json!({
@@ -439,9 +439,9 @@ fn route_json(
     let tool_arguments = route_tool_arguments(workflow_id, best_tool, hints, account);
 
     json!({
-        "workflow_command": format!("yacli workflow show {workflow_id}"),
-        "workflow_resource": format!("resource://yacli/workflow/{workflow_id}"),
-        "dashboard_view": format!("ui://yacli/dashboard?section=workflows&workflow={workflow_id}"),
+        "workflow_command": format!("yamcli workflow show {workflow_id}"),
+        "workflow_resource": format!("resource://yamcli/workflow/{workflow_id}"),
+        "dashboard_view": format!("ui://yamcli/dashboard?section=workflows&workflow={workflow_id}"),
         "prompt_name": prompt_name.unwrap_or_default(),
         "best_tool": best_tool,
         "tool_arguments": tool_arguments,
@@ -475,8 +475,8 @@ fn route_tool_arguments(
     }
 
     match (workflow_id, best_tool) {
-        ("daily-briefing", "yacli.mail.list") => {}
-        ("reply-with-context", "yacli.mail.reply") => {
+        ("daily-briefing", "yamcli.mail.list") => {}
+        ("reply-with-context", "yamcli.mail.reply") => {
             args.insert(
                 "text".to_string(),
                 Value::String(default_if_empty(
@@ -485,7 +485,7 @@ fn route_tool_arguments(
                 )),
             );
         }
-        ("attachment-to-disk", "yacli.mail.attachment.export") => {
+        ("attachment-to-disk", "yamcli.mail.attachment.export") => {
             let attachment_name =
                 if !hints.quoted_text.is_empty() && hints.quoted_text.contains('.') {
                     hints.quoted_text.clone()
@@ -502,7 +502,7 @@ fn route_tool_arguments(
                 Value::String(format!("./{}", path_basename(&attachment_name))),
             );
         }
-        ("send-file-by-mail", "yacli.mail.send") => {
+        ("send-file-by-mail", "yamcli.mail.send") => {
             args.insert(
                 "to".to_string(),
                 Value::String(default_if_empty(&hints.email, "person@example.com")),
@@ -523,7 +523,7 @@ fn route_tool_arguments(
                 ))]),
             );
         }
-        ("send-link-by-mail", "yacli.mail.send_link") => {
+        ("send-link-by-mail", "yamcli.mail.send_link") => {
             let source_path =
                 default_if_empty(&hints.local_path, &format!("./{inferred_filename}"));
             let disk_path = if !hints.disk_path.is_empty() {
@@ -542,7 +542,7 @@ fn route_tool_arguments(
             args.insert("source_path".to_string(), Value::String(source_path));
             args.insert("disk_path".to_string(), Value::String(disk_path));
         }
-        ("publish-file-link", "yacli.disk.upload_link") => {
+        ("publish-file-link", "yamcli.disk.upload_link") => {
             let source = default_if_empty(&hints.local_path, &format!("./{inferred_filename}"));
             let path = if !hints.disk_path.is_empty() {
                 hints.disk_path.clone()
@@ -552,7 +552,7 @@ fn route_tool_arguments(
             args.insert("source".to_string(), Value::String(source));
             args.insert("path".to_string(), Value::String(path));
         }
-        ("revoke-public-link", "yacli.disk.unpublish") => {
+        ("revoke-public-link", "yamcli.disk.unpublish") => {
             args.insert(
                 "path".to_string(),
                 Value::String(default_if_empty(
@@ -561,7 +561,7 @@ fn route_tool_arguments(
                 )),
             );
         }
-        ("invite-to-calendar", "yacli.mail.invite.create_event") => {
+        ("invite-to-calendar", "yamcli.mail.invite.create_event") => {
             args.insert(
                 "calendar".to_string(),
                 Value::String(default_if_empty(&hints.calendar, "team")),
@@ -744,7 +744,7 @@ mod tests {
         );
         assert_eq!(
             payload["best_match"]["route"]["best_tool"],
-            "yacli.mail.invite.create_event"
+            "yamcli.mail.invite.create_event"
         );
         assert_eq!(
             payload["best_match"]["route"]["tool_arguments"]["calendar"],
@@ -776,12 +776,12 @@ mod tests {
     #[test]
     fn route_goal_extracts_canonical_hints_for_autofill() {
         let payload = goal_route_payload(
-            "отправь \"Материалы ревью\" на andrei@nextstat.io файл ./review.zip через disk:/docs/review.zip в календарь team",
+            "отправь \"Материалы ревью\" на andrei@example.com файл ./review.zip через disk:/docs/review.zip в календарь team",
             None,
         )
         .expect("goal route");
 
-        assert_eq!(payload["hints"]["email"], "andrei@nextstat.io");
+        assert_eq!(payload["hints"]["email"], "andrei@example.com");
         assert_eq!(payload["hints"]["local_path"], "./review.zip");
         assert_eq!(payload["hints"]["disk_path"], "disk:/docs/review.zip");
         assert_eq!(payload["hints"]["quoted_text"], "Материалы ревью");
@@ -789,7 +789,7 @@ mod tests {
         assert_eq!(payload["best_match"]["workflow"]["id"], "send-link-by-mail");
         assert_eq!(
             payload["best_match"]["route"]["tool_arguments"]["to"],
-            "andrei@nextstat.io"
+            "andrei@example.com"
         );
         assert_eq!(
             payload["best_match"]["route"]["tool_arguments"]["source_path"],
@@ -806,7 +806,7 @@ mod tests {
         let payload = goal_route_payload("сделай что-нибудь полезное", None).expect("goal route");
 
         assert_eq!(payload["status"], "fallback");
-        assert_eq!(payload["suggested_command"], "yacli workflow list");
+        assert_eq!(payload["suggested_command"], "yamcli workflow list");
         assert_eq!(
             payload["recommendations"]
                 .as_array()

@@ -1,9 +1,9 @@
 ---
-name: yacli-publish-file-link
+name: yamcli-publish-file-link
 description: Загрузить локальный файл на Яндекс Диск, опубликовать его и вернуть публичную ссылку без промежуточных ручных шагов.
 ---
 
-# yacli-publish-file-link
+# yamcli-publish-file-link
 
 Используй этот workflow, когда пользователь хочет получить публичную ссылку на локальный файл через Яндекс Диск.
 
@@ -13,13 +13,13 @@ description: Загрузить локальный файл на Яндекс Д
 2. Для безопасного preview сначала можно вызвать:
 
 ```bash
-yacli disk upload-link --source ./archive.zip --path disk:/docs/archive.zip --dry-run
+yamcli disk upload-link --source ./archive.zip --path disk:/docs/archive.zip --dry-run
 ```
 
 3. Для реального выполнения используй:
 
 ```bash
-yacli disk upload-link --source ./archive.zip --path disk:/docs/archive.zip
+yamcli disk upload-link --source ./archive.zip --path disk:/docs/archive.zip
 ```
 
 4. Верни пользователю `public_url` и при необходимости `public_key`.
@@ -27,4 +27,4 @@ yacli disk upload-link --source ./archive.zip --path disk:/docs/archive.zip
 ## Важно
 
 - Не притворяйся, что файл опубликован, если команда завершилась ошибкой.
-- Если цель пользователя не просто получить ссылку, а отправить её письмом, переключайся на workflow `yacli-send-link-by-mail`.
+- Если цель пользователя не просто получить ссылку, а отправить её письмом, переключайся на workflow `yamcli-send-link-by-mail`.

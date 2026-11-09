@@ -1,6 +1,6 @@
 [package]
-name = "yacli"
-version = "0.5.5"
+name = "yamcli"
+version = "1.0.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/aikalinin/mcp-local-ya"

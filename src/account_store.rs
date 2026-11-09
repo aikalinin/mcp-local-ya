@@ -3,7 +3,7 @@ use std::fs;
 
 use url::Url;
 
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 use crate::model::{AccountConfig, AccountsFile};
 use crate::paths::accounts_path;
 use crate::persist::write_config_file;
@@ -35,7 +35,7 @@ impl AccountStore {
 
     pub fn add_account(&mut self, name: String, mut account: AccountConfig) -> Result<()> {
         if self.file.accounts.contains_key(&name) {
-            return Err(YacliError::AccountExists(name));
+            return Err(YamcliError::AccountExists(name));
         }
         if account.default || self.file.accounts.is_empty() {
             self.clear_default();
@@ -47,7 +47,7 @@ impl AccountStore {
 
     pub fn set_current(&mut self, name: &str) -> Result<()> {
         if !self.file.accounts.contains_key(name) {
-            return Err(YacliError::AccountNotFound(name.to_string()));
+            return Err(YamcliError::AccountNotFound(name.to_string()));
         }
 
         self.clear_default();
@@ -62,7 +62,7 @@ impl AccountStore {
             if self.file.accounts.contains_key(name) {
                 return Ok(name.to_string());
             }
-            return Err(YacliError::AccountNotFound(name.to_string()));
+            return Err(YamcliError::AccountNotFound(name.to_string()));
         }
 
         if let Some(name) = self
@@ -84,7 +84,7 @@ impl AccountStore {
                 .expect("single account key exists"));
         }
 
-        Err(YacliError::CurrentAccountMissing)
+        Err(YamcliError::CurrentAccountMissing)
     }
 
     pub fn current_account_name(&self) -> Result<String> {
@@ -101,7 +101,7 @@ impl AccountStore {
         self.file
             .accounts
             .get(name)
-            .ok_or_else(|| YacliError::AccountNotFound(name.to_string()))
+            .ok_or_else(|| YamcliError::AccountNotFound(name.to_string()))
     }
 
     pub fn summaries(&self) -> BTreeMap<String, &AccountConfig> {
@@ -122,14 +122,14 @@ impl AccountStore {
             .file
             .accounts
             .get_mut(account_name)
-            .ok_or_else(|| YacliError::AccountNotFound(account_name.to_string()))?;
+            .ok_or_else(|| YamcliError::AccountNotFound(account_name.to_string()))?;
 
         match service {
             "mail" => account.mail.credential_ref = credential_ref,
             "calendar" => account.calendar.credential_ref = credential_ref,
             "disk" => account.disk.credential_ref = credential_ref,
             _ => {
-                return Err(YacliError::Config(format!(
+                return Err(YamcliError::Config(format!(
                     "unknown service for credential_ref update: {service}"
                 )));
             }

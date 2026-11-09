@@ -14,12 +14,12 @@ use tempfile::tempdir;
 use zip::ZipArchive;
 
 use crate::cli::OutputFormat;
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 use crate::output::RenderedOutput;
 
 const REPO_SLUG: &str = "aikalinin/mcp-local-ya";
 const DEFAULT_VERSION: &str = "latest";
-const UPDATE_BASE_URL_ENV: &str = "YACLI_UPDATE_BASE_URL";
+const UPDATE_BASE_URL_ENV: &str = "YAMCLI_UPDATE_BASE_URL";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ArchiveKind {
@@ -106,9 +106,9 @@ pub fn check_for_update(version: Option<&str>) -> Result<UpdateStatusReport> {
 
 fn release_client() -> Result<Client> {
     Client::builder()
-        .user_agent(format!("yacli/{}", env!("CARGO_PKG_VERSION")))
+        .user_agent(format!("yamcli/{}", env!("CARGO_PKG_VERSION")))
         .build()
-        .map_err(YacliError::from)
+        .map_err(YamcliError::from)
 }
 
 fn normalize_version(version: &str) -> String {
@@ -148,35 +148,35 @@ fn current_release_asset() -> Result<ReleaseAsset> {
     match (env::consts::OS, env::consts::ARCH) {
         ("macos", "aarch64") => Ok(ReleaseAsset {
             archive_kind: ArchiveKind::TarGz,
-            binary_name: "yacli",
-            file_name: "yacli-aarch64-apple-darwin.tar.gz",
+            binary_name: "yamcli",
+            file_name: "yamcli-aarch64-apple-darwin.tar.gz",
             target: "aarch64-apple-darwin",
         }),
         ("macos", "x86_64") => Ok(ReleaseAsset {
             archive_kind: ArchiveKind::TarGz,
-            binary_name: "yacli",
-            file_name: "yacli-x86_64-apple-darwin.tar.gz",
+            binary_name: "yamcli",
+            file_name: "yamcli-x86_64-apple-darwin.tar.gz",
             target: "x86_64-apple-darwin",
         }),
         ("linux", "aarch64") => Ok(ReleaseAsset {
             archive_kind: ArchiveKind::TarGz,
-            binary_name: "yacli",
-            file_name: "yacli-aarch64-unknown-linux-gnu.tar.gz",
+            binary_name: "yamcli",
+            file_name: "yamcli-aarch64-unknown-linux-gnu.tar.gz",
             target: "aarch64-unknown-linux-gnu",
         }),
         ("linux", "x86_64") => Ok(ReleaseAsset {
             archive_kind: ArchiveKind::TarGz,
-            binary_name: "yacli",
-            file_name: "yacli-x86_64-unknown-linux-gnu.tar.gz",
+            binary_name: "yamcli",
+            file_name: "yamcli-x86_64-unknown-linux-gnu.tar.gz",
             target: "x86_64-unknown-linux-gnu",
         }),
         ("windows", "x86_64") => Ok(ReleaseAsset {
             archive_kind: ArchiveKind::Zip,
-            binary_name: "yacli.exe",
-            file_name: "yacli-x86_64-pc-windows-msvc.zip",
+            binary_name: "yamcli.exe",
+            file_name: "yamcli-x86_64-pc-windows-msvc.zip",
             target: "x86_64-pc-windows-msvc",
         }),
-        (os, arch) => Err(YacliError::UnsupportedOperation(format!(
+        (os, arch) => Err(YamcliError::UnsupportedOperation(format!(
             "auto-update is not published for target {arch}-{os}"
         ))),
     }
@@ -186,10 +186,10 @@ fn fetch_checksums(client: &Client, base_url: &str) -> Result<(String, Option<St
     let response = client
         .get(format!("{base_url}/SHA256SUMS"))
         .send()
-        .map_err(YacliError::from)?;
+        .map_err(YamcliError::from)?;
     let final_url = response.url().clone();
-    let response = response.error_for_status().map_err(YacliError::from)?;
-    let body = response.text().map_err(YacliError::from)?;
+    let response = response.error_for_status().map_err(YamcliError::from)?;
+    let body = response.text().map_err(YamcliError::from)?;
     Ok((body, version_from_download_url(&final_url)))
 }
 
@@ -214,7 +214,7 @@ fn checksum_for_asset(checksums: &str, asset_name: &str) -> Result<String> {
         }
     }
 
-    Err(YacliError::Integrity(format!(
+    Err(YamcliError::Integrity(format!(
         "missing checksum for release asset {asset_name}"
     )))
 }
@@ -223,12 +223,12 @@ fn download_release_archive(client: &Client, plan: &ReleasePlan) -> Result<Vec<u
     let response = client
         .get(format!("{}/{}", plan.base_url, plan.asset.file_name))
         .send()
-        .map_err(YacliError::from)?;
-    let response = response.error_for_status().map_err(YacliError::from)?;
+        .map_err(YamcliError::from)?;
+    let response = response.error_for_status().map_err(YamcliError::from)?;
     response
         .bytes()
         .map(|bytes| bytes.to_vec())
-        .map_err(YacliError::from)
+        .map_err(YamcliError::from)
 }
 
 fn resolve_release_plan(version: &str, base_url: Option<&str>) -> Result<(String, ReleasePlan)> {
@@ -257,7 +257,7 @@ fn verify_checksum(bytes: &[u8], expected: &str, asset_name: &str) -> Result<()>
     if actual == expected {
         Ok(())
     } else {
-        Err(YacliError::Integrity(format!(
+        Err(YamcliError::Integrity(format!(
             "checksum mismatch for {asset_name}: expected {expected}, got {actual}"
         )))
     }
@@ -265,13 +265,13 @@ fn verify_checksum(bytes: &[u8], expected: &str, asset_name: &str) -> Result<()>
 
 fn stage_release_binary(bytes: &[u8], asset: &ReleaseAsset) -> Result<PathBuf> {
     let tmp_dir = tempdir().map_err(|err| {
-        YacliError::Io(format!(
+        YamcliError::Io(format!(
             "failed to create temporary update directory: {err}"
         ))
     })?;
     let extract_root = tmp_dir.path().join("extract");
     fs::create_dir_all(&extract_root)
-        .map_err(|err| YacliError::Io(format!("failed to create extraction directory: {err}")))?;
+        .map_err(|err| YamcliError::Io(format!("failed to create extraction directory: {err}")))?;
 
     match asset.archive_kind {
         ArchiveKind::TarGz => extract_tar_gz(bytes, &extract_root)?,
@@ -281,7 +281,7 @@ fn stage_release_binary(bytes: &[u8], asset: &ReleaseAsset) -> Result<PathBuf> {
     let extracted_binary = find_binary(&extract_root, asset.binary_name)?;
     let staged_binary = tmp_dir.path().join(asset.binary_name);
     fs::copy(&extracted_binary, &staged_binary).map_err(|err| {
-        YacliError::Io(format!(
+        YamcliError::Io(format!(
             "failed to stage extracted binary {}: {err}",
             extracted_binary.display()
         ))
@@ -297,25 +297,25 @@ fn extract_tar_gz(bytes: &[u8], destination: &Path) -> Result<()> {
     let mut archive = Archive::new(decoder);
     archive
         .unpack(destination)
-        .map_err(|err| YacliError::Io(format!("failed to unpack release archive: {err}")))
+        .map_err(|err| YamcliError::Io(format!("failed to unpack release archive: {err}")))
 }
 
 fn extract_zip(bytes: &[u8], destination: &Path) -> Result<()> {
     let reader = Cursor::new(bytes);
     let mut archive = ZipArchive::new(reader)
-        .map_err(|err| YacliError::Io(format!("failed to open release zip: {err}")))?;
+        .map_err(|err| YamcliError::Io(format!("failed to open release zip: {err}")))?;
 
     for index in 0..archive.len() {
         let mut entry = archive
             .by_index(index)
-            .map_err(|err| YacliError::Io(format!("failed to read release zip entry: {err}")))?;
+            .map_err(|err| YamcliError::Io(format!("failed to read release zip entry: {err}")))?;
         let Some(name) = entry.enclosed_name().map(|name| name.to_path_buf()) else {
             continue;
         };
         let output_path = destination.join(name);
         if entry.name().ends_with('/') {
             fs::create_dir_all(&output_path).map_err(|err| {
-                YacliError::Io(format!(
+                YamcliError::Io(format!(
                     "failed to create extracted directory {}: {err}",
                     output_path.display()
                 ))
@@ -325,7 +325,7 @@ fn extract_zip(bytes: &[u8], destination: &Path) -> Result<()> {
 
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent).map_err(|err| {
-                YacliError::Io(format!(
+                YamcliError::Io(format!(
                     "failed to create extracted directory {}: {err}",
                     parent.display()
                 ))
@@ -333,20 +333,20 @@ fn extract_zip(bytes: &[u8], destination: &Path) -> Result<()> {
         }
 
         let mut output = fs::File::create(&output_path).map_err(|err| {
-            YacliError::Io(format!(
+            YamcliError::Io(format!(
                 "failed to create extracted file {}: {err}",
                 output_path.display()
             ))
         })?;
         let mut buffer = Vec::new();
         entry.read_to_end(&mut buffer).map_err(|err| {
-            YacliError::Io(format!(
+            YamcliError::Io(format!(
                 "failed to read extracted file {}: {err}",
                 output_path.display()
             ))
         })?;
         output.write_all(&buffer).map_err(|err| {
-            YacliError::Io(format!(
+            YamcliError::Io(format!(
                 "failed to write extracted file {}: {err}",
                 output_path.display()
             ))
@@ -356,7 +356,7 @@ fn extract_zip(bytes: &[u8], destination: &Path) -> Result<()> {
         if let Some(mode) = entry.unix_mode() {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&output_path, fs::Permissions::from_mode(mode)).map_err(|err| {
-                YacliError::Io(format!(
+                YamcliError::Io(format!(
                     "failed to restore permissions for {}: {err}",
                     output_path.display()
                 ))
@@ -371,13 +371,13 @@ fn find_binary(root: &Path, binary_name: &str) -> Result<PathBuf> {
     let mut stack = vec![root.to_path_buf()];
     while let Some(path) = stack.pop() {
         for entry in fs::read_dir(&path).map_err(|err| {
-            YacliError::Io(format!(
+            YamcliError::Io(format!(
                 "failed to read extracted directory {}: {err}",
                 path.display()
             ))
         })? {
             let entry = entry.map_err(|err| {
-                YacliError::Io(format!(
+                YamcliError::Io(format!(
                     "failed to read extracted directory entry in {}: {err}",
                     path.display()
                 ))
@@ -386,7 +386,7 @@ fn find_binary(root: &Path, binary_name: &str) -> Result<PathBuf> {
             if entry
                 .file_type()
                 .map_err(|err| {
-                    YacliError::Io(format!(
+                    YamcliError::Io(format!(
                         "failed to inspect extracted path {}: {err}",
                         entry_path.display()
                     ))
@@ -406,7 +406,7 @@ fn find_binary(root: &Path, binary_name: &str) -> Result<PathBuf> {
         }
     }
 
-    Err(YacliError::Integrity(format!(
+    Err(YamcliError::Integrity(format!(
         "release archive does not contain executable {binary_name}"
     )))
 }
@@ -417,7 +417,7 @@ fn make_executable_if_needed(path: &Path) -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
         let mut permissions = fs::metadata(path)
             .map_err(|err| {
-                YacliError::Io(format!(
+                YamcliError::Io(format!(
                     "failed to read metadata for {}: {err}",
                     path.display()
                 ))
@@ -425,7 +425,7 @@ fn make_executable_if_needed(path: &Path) -> Result<()> {
             .permissions();
         permissions.set_mode(0o755);
         fs::set_permissions(path, permissions).map_err(|err| {
-            YacliError::Io(format!(
+            YamcliError::Io(format!(
                 "failed to set executable permissions for {}: {err}",
                 path.display()
             ))
@@ -437,7 +437,7 @@ fn make_executable_if_needed(path: &Path) -> Result<()> {
 
 fn replace_current_binary(staged_binary: &Path) -> Result<()> {
     self_replace::self_replace(staged_binary).map_err(|err| {
-        YacliError::Io(format!(
+        YamcliError::Io(format!(
             "failed to replace current executable with {}: {err}",
             staged_binary.display()
         ))
@@ -551,20 +551,20 @@ mod tests {
 
     #[test]
     fn checksum_for_asset_reads_sha256sums() {
-        let checksums = "abc123  yacli-aarch64-apple-darwin.tar.gz\nxyz789  other.tar.gz\n";
+        let checksums = "abc123  yamcli-aarch64-apple-darwin.tar.gz\nxyz789  other.tar.gz\n";
         assert_eq!(
-            checksum_for_asset(checksums, "yacli-aarch64-apple-darwin.tar.gz").expect("checksum"),
+            checksum_for_asset(checksums, "yamcli-aarch64-apple-darwin.tar.gz").expect("checksum"),
             "abc123"
         );
     }
 
     #[test]
     fn extract_tar_gz_stage_finds_unix_binary() {
-        let bytes = build_tar_gz_asset("yacli", b"unix-binary");
+        let bytes = build_tar_gz_asset("yamcli", b"unix-binary");
         let asset = ReleaseAsset {
             archive_kind: ArchiveKind::TarGz,
-            binary_name: "yacli",
-            file_name: "yacli-x86_64-unknown-linux-gnu.tar.gz",
+            binary_name: "yamcli",
+            file_name: "yamcli-x86_64-unknown-linux-gnu.tar.gz",
             target: "x86_64-unknown-linux-gnu",
         };
 
@@ -574,11 +574,11 @@ mod tests {
 
     #[test]
     fn extract_zip_stage_finds_windows_binary() {
-        let bytes = build_zip_asset("yacli.exe", b"windows-binary");
+        let bytes = build_zip_asset("yamcli.exe", b"windows-binary");
         let asset = ReleaseAsset {
             archive_kind: ArchiveKind::Zip,
-            binary_name: "yacli.exe",
-            file_name: "yacli-x86_64-pc-windows-msvc.zip",
+            binary_name: "yamcli.exe",
+            file_name: "yamcli-x86_64-pc-windows-msvc.zip",
             target: "x86_64-pc-windows-msvc",
         };
 
@@ -591,7 +591,7 @@ mod tests {
         {
             let encoder = GzEncoder::new(&mut archive, Compression::default());
             let mut builder = Builder::new(encoder);
-            let path = format!("yacli-test/{binary_name}");
+            let path = format!("yamcli-test/{binary_name}");
             let mut header = tar::Header::new_gnu();
             header.set_size(contents.len() as u64);
             header.set_mode(0o755);
@@ -610,7 +610,7 @@ mod tests {
         let file = fs::File::create(&archive_path).expect("zip file");
         let mut zip = zip::ZipWriter::new(file);
         zip.start_file(
-            format!("yacli-test/{binary_name}"),
+            format!("yamcli-test/{binary_name}"),
             SimpleFileOptions::default(),
         )
         .expect("start file");

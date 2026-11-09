@@ -10,7 +10,7 @@ use reqwest::blocking::Client;
 use serde::Serialize;
 use url::Url;
 
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 
 const CALDAV_TIMEOUT_SECS: u64 = 20;
 const DEFAULT_EVENT_WINDOW_DAYS: u64 = 30;
@@ -112,30 +112,30 @@ pub fn calendar_create_request_from_invites(
     command_name: &str,
 ) -> Result<(CalendarCreateRequest, CalendarInvite)> {
     if event_index == 0 {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{command_name} --event-index must be greater than zero"
         )));
     }
     if invites.is_empty() {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{command_name} attachment does not contain any VEVENT entries"
         )));
     }
 
     let Some(invite) = invites.get(event_index - 1).cloned() else {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{command_name} --event-index {event_index} is out of range; attachment contains {} VEVENT entries",
             invites.len()
         )));
     };
     let summary = invite.summary.clone().ok_or_else(|| {
-        YacliError::Validation(format!("{command_name} selected VEVENT is missing SUMMARY"))
+        YamcliError::Validation(format!("{command_name} selected VEVENT is missing SUMMARY"))
     })?;
     let start = invite.start.clone().ok_or_else(|| {
-        YacliError::Validation(format!("{command_name} selected VEVENT is missing DTSTART"))
+        YamcliError::Validation(format!("{command_name} selected VEVENT is missing DTSTART"))
     })?;
     let end = invite.end.clone().ok_or_else(|| {
-        YacliError::Validation(format!("{command_name} selected VEVENT is missing DTEND"))
+        YamcliError::Validation(format!("{command_name} selected VEVENT is missing DTEND"))
     })?;
 
     Ok((
@@ -157,12 +157,12 @@ pub fn parse_event_window(
     limit: usize,
 ) -> Result<CalendarEventWindow> {
     if limit == 0 {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "calendar events --limit должен быть больше нуля".to_string(),
         ));
     }
     if limit > 100 {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "calendar events --limit не должен быть больше 100".to_string(),
         ));
     }
@@ -172,7 +172,7 @@ pub fn parse_event_window(
     let default_to = now
         .checked_add_days(Days::new(DEFAULT_EVENT_WINDOW_DAYS))
         .ok_or_else(|| {
-            YacliError::Validation("failed to compute default calendar time window".to_string())
+            YamcliError::Validation("failed to compute default calendar time window".to_string())
         })?;
 
     let from = match from {
@@ -185,7 +185,7 @@ pub fn parse_event_window(
     };
 
     if to <= from {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "calendar events <TO> должен быть позже <FROM>".to_string(),
         ));
     }
@@ -255,7 +255,7 @@ pub fn delete_calendar_event(
 
 pub fn calendar_create_command(request: &CalendarCreateRequest, dry_run: bool) -> String {
     let mut command = format!(
-        "yacli calendar create {} {} {}",
+        "yamcli calendar create {} {} {}",
         shell_quote(&request.summary),
         shell_quote(&request.start),
         shell_quote(&request.end)
@@ -314,9 +314,9 @@ struct CaldavClient {
 impl CaldavClient {
     fn new(base_url: &str, account: &str, app_password: &str) -> Result<Self> {
         let base_url = Url::parse(base_url)
-            .map_err(|err| YacliError::Config(format!("invalid CalDAV base URL: {err}")))?;
+            .map_err(|err| YamcliError::Config(format!("invalid CalDAV base URL: {err}")))?;
         let http = Client::builder()
-            .user_agent(format!("yacli/{}", env!("CARGO_PKG_VERSION")))
+            .user_agent(format!("yamcli/{}", env!("CARGO_PKG_VERSION")))
             .timeout(Duration::from_secs(CALDAV_TIMEOUT_SECS))
             .build()?;
 
@@ -333,7 +333,7 @@ impl CaldavClient {
         let home_set_url = self.calendar_home_set(&principal_url)?;
         let xml = self.send_xml(
             Method::from_bytes(b"PROPFIND")
-                .map_err(|err| YacliError::Config(format!("invalid PROPFIND method: {err}")))?,
+                .map_err(|err| YamcliError::Config(format!("invalid PROPFIND method: {err}")))?,
             &home_set_url,
             Some("1"),
             r#"<?xml version="1.0" encoding="utf-8"?>
@@ -376,8 +376,8 @@ impl CaldavClient {
                     || calendar.href == calendar_ref
             })
             .ok_or_else(|| {
-                YacliError::Validation(format!(
-                    "calendar `{calendar_ref}` not found; run `yacli calendar calendars` to inspect available ids"
+                YamcliError::Validation(format!(
+                    "calendar `{calendar_ref}` not found; run `yamcli calendar calendars` to inspect available ids"
                 ))
             })
     }
@@ -391,7 +391,7 @@ impl CaldavClient {
 
         let xml = self.send_xml(
             Method::from_bytes(b"REPORT")
-                .map_err(|err| YacliError::Config(format!("invalid REPORT method: {err}")))?,
+                .map_err(|err| YamcliError::Config(format!("invalid REPORT method: {err}")))?,
             &self.resolve_href(&calendar.href)?,
             Some("1"),
             &build_calendar_query_xml(request),
@@ -518,7 +518,7 @@ impl CaldavClient {
     fn find_event_by_uid(&self, calendar: &CalendarCollection, uid: &str) -> Result<CalendarEvent> {
         let xml = self.send_xml(
             Method::from_bytes(b"REPORT")
-                .map_err(|err| YacliError::Config(format!("invalid REPORT method: {err}")))?,
+                .map_err(|err| YamcliError::Config(format!("invalid REPORT method: {err}")))?,
             &self.resolve_href(&calendar.href)?,
             Some("1"),
             &build_calendar_uid_query_xml(uid),
@@ -553,12 +553,12 @@ impl CaldavClient {
         }
 
         match matches.len() {
-            0 => Err(YacliError::Validation(format!(
+            0 => Err(YamcliError::Validation(format!(
                 "calendar event with uid `{uid}` not found in calendar `{}`",
                 calendar.id
             ))),
             1 => Ok(matches.remove(0)),
-            _ => Err(YacliError::Integrity(format!(
+            _ => Err(YamcliError::Integrity(format!(
                 "multiple calendar events with uid `{uid}` were returned for calendar `{}`",
                 calendar.id
             ))),
@@ -568,7 +568,7 @@ impl CaldavClient {
     fn current_user_principal(&self) -> Result<Url> {
         let xml = self.send_xml(
             Method::from_bytes(b"PROPFIND")
-                .map_err(|err| YacliError::Config(format!("invalid PROPFIND method: {err}")))?,
+                .map_err(|err| YamcliError::Config(format!("invalid PROPFIND method: {err}")))?,
             &self.base_url,
             Some("0"),
             r#"<?xml version="1.0" encoding="utf-8"?>
@@ -584,7 +584,7 @@ impl CaldavClient {
             .into_iter()
             .find_map(|response| response.current_user_principal)
             .ok_or_else(|| {
-                YacliError::Api("CalDAV server did not return current-user-principal".to_string())
+                YamcliError::Api("CalDAV server did not return current-user-principal".to_string())
             })?;
         self.resolve_href(&href)
     }
@@ -592,7 +592,7 @@ impl CaldavClient {
     fn calendar_home_set(&self, principal_url: &Url) -> Result<Url> {
         let xml = self.send_xml(
             Method::from_bytes(b"PROPFIND")
-                .map_err(|err| YacliError::Config(format!("invalid PROPFIND method: {err}")))?,
+                .map_err(|err| YamcliError::Config(format!("invalid PROPFIND method: {err}")))?,
             principal_url,
             Some("0"),
             r#"<?xml version="1.0" encoding="utf-8"?>
@@ -609,7 +609,7 @@ impl CaldavClient {
             .into_iter()
             .find_map(|response| response.calendar_home_set)
             .ok_or_else(|| {
-                YacliError::Api("CalDAV server did not return calendar-home-set".to_string())
+                YamcliError::Api("CalDAV server did not return calendar-home-set".to_string())
             })?;
         self.resolve_href(&href)
     }
@@ -638,13 +638,13 @@ impl CaldavClient {
         let body = response.text()?;
 
         if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
-            return Err(YacliError::Auth(format!(
+            return Err(YamcliError::Auth(format!(
                 "{action} failed with status {}. Check the Yandex app password and account.email value.",
                 status.as_u16()
             )));
         }
         if !status.is_success() && status.as_u16() != 207 {
-            return Err(YacliError::Api(format!(
+            return Err(YamcliError::Api(format!(
                 "{action} failed with status {}: {}",
                 status.as_u16(),
                 truncate_body(&body)
@@ -673,13 +673,13 @@ impl CaldavClient {
         let response_body = response.text()?;
 
         if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
-            return Err(YacliError::Auth(format!(
+            return Err(YamcliError::Auth(format!(
                 "{action} failed with status {}. Check the Yandex app password and account.email value.",
                 status.as_u16()
             )));
         }
         if !status.is_success() {
-            return Err(YacliError::Api(format!(
+            return Err(YamcliError::Api(format!(
                 "{action} failed with status {}: {}",
                 status.as_u16(),
                 truncate_body(&response_body)
@@ -709,13 +709,13 @@ impl CaldavClient {
         let body = response.text()?;
 
         if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
-            return Err(YacliError::Auth(format!(
+            return Err(YamcliError::Auth(format!(
                 "{action} failed with status {}. Check the Yandex app password and account.email value.",
                 status.as_u16()
             )));
         }
         if !status.is_success() {
-            return Err(YacliError::Api(format!(
+            return Err(YamcliError::Api(format!(
                 "{action} failed with status {}: {}",
                 status.as_u16(),
                 truncate_body(&body)
@@ -728,7 +728,7 @@ impl CaldavClient {
     fn resolve_href(&self, href: &str) -> Result<Url> {
         self.base_url
             .join(href)
-            .map_err(|err| YacliError::Config(format!("invalid CalDAV href `{href}`: {err}")))
+            .map_err(|err| YamcliError::Config(format!("invalid CalDAV href `{href}`: {err}")))
     }
 }
 
@@ -779,7 +779,7 @@ fn parse_dav_responses(xml: &str) -> Result<Vec<DavResponse>> {
                 let text = event
                     .unescape()
                     .map_err(|err| {
-                        YacliError::Serialization(format!(
+                        YamcliError::Serialization(format!(
                             "failed to decode CalDAV XML text: {err}"
                         ))
                     })?
@@ -801,7 +801,7 @@ fn parse_dav_responses(xml: &str) -> Result<Vec<DavResponse>> {
             }
             Ok(Event::Eof) => break,
             Err(err) => {
-                return Err(YacliError::Serialization(format!(
+                return Err(YamcliError::Serialization(format!(
                     "failed to parse CalDAV XML response: {err}"
                 )));
             }
@@ -951,7 +951,7 @@ fn parse_create_event_window(start: &str, end: &str) -> Result<ParsedCalendarWri
     match (start, end) {
         (ParsedCalendarBoundary::Date(start), ParsedCalendarBoundary::Date(end)) => {
             if end <= start {
-                return Err(YacliError::Validation(
+                return Err(YamcliError::Validation(
                     "calendar create <END> должен быть позже <START>".to_string(),
                 ));
             }
@@ -965,7 +965,7 @@ fn parse_create_event_window(start: &str, end: &str) -> Result<ParsedCalendarWri
         }
         (ParsedCalendarBoundary::DateTime(start), ParsedCalendarBoundary::DateTime(end)) => {
             if end <= start {
-                return Err(YacliError::Validation(
+                return Err(YamcliError::Validation(
                     "calendar create <END> должен быть позже <START>".to_string(),
                 ));
             }
@@ -977,7 +977,7 @@ fn parse_create_event_window(start: &str, end: &str) -> Result<ParsedCalendarWri
                 all_day: false,
             })
         }
-        _ => Err(YacliError::Validation(
+        _ => Err(YamcliError::Validation(
             "calendar create requires both --start and --end to use the same format: either YYYY-MM-DD for all-day events or RFC3339 for timed events".to_string(),
         )),
     }
@@ -990,7 +990,7 @@ fn build_calendar_create_review(
     let window = parse_create_event_window(&request.start, &request.end)?;
     let summary = request.summary.trim();
     if summary.is_empty() {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "{command_name} <SUMMARY> не должен быть пустым"
         )));
     }
@@ -1014,7 +1014,7 @@ fn parse_calendar_boundary(value: &str, flag_name: &str) -> Result<ParsedCalenda
     DateTime::parse_from_rfc3339(value)
         .map(|value| ParsedCalendarBoundary::DateTime(value.with_timezone(&Utc)))
         .map_err(|_| {
-            YacliError::Validation(format!(
+            YamcliError::Validation(format!(
                 "{flag_name} must use YYYY-MM-DD or RFC3339, got `{value}`"
             ))
         })
@@ -1048,7 +1048,7 @@ fn build_calendar_event_ical(
     let mut lines = vec![
         "BEGIN:VCALENDAR".to_string(),
         "VERSION:2.0".to_string(),
-        "PRODID:-//NextStat//yacli//EN".to_string(),
+        "PRODID:-//onega.io//yamcli//EN".to_string(),
         "CALSCALE:GREGORIAN".to_string(),
         "BEGIN:VEVENT".to_string(),
         format!("UID:{uid}"),
@@ -1081,7 +1081,7 @@ fn collection_id_from_href(href: &str) -> Option<String> {
 
 fn generate_calendar_uid() -> String {
     format!(
-        "yacli-{}-{:016x}@nextstat.dev",
+        "yamcli-{}-{:016x}@onega.io",
         Utc::now().timestamp_micros(),
         random::<u64>()
     )
@@ -1280,7 +1280,7 @@ fn shell_quote(value: &str) -> String {
 fn parse_time_boundary(value: &str, flag_name: &str) -> Result<DateTime<Utc>> {
     if let Ok(date) = NaiveDate::parse_from_str(value, "%Y-%m-%d") {
         let datetime = date.and_hms_opt(0, 0, 0).ok_or_else(|| {
-            YacliError::Validation(format!("{flag_name} contains an invalid date"))
+            YamcliError::Validation(format!("{flag_name} contains an invalid date"))
         })?;
         return Ok(datetime.and_utc());
     }
@@ -1288,7 +1288,7 @@ fn parse_time_boundary(value: &str, flag_name: &str) -> Result<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(value)
         .map(|value| value.with_timezone(&Utc))
         .map_err(|_| {
-            YacliError::Validation(format!(
+            YamcliError::Validation(format!(
                 "{flag_name} must use YYYY-MM-DD or RFC3339, got `{value}`"
             ))
         })

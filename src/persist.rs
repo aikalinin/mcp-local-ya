@@ -4,12 +4,12 @@ use std::path::Path;
 
 use tempfile::NamedTempFile;
 
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 
 pub fn write_config_file(path: &Path, contents: &str) -> Result<()> {
     let parent = path
         .parent()
-        .ok_or_else(|| YacliError::Io(format!("{} has no parent directory", path.display())))?;
+        .ok_or_else(|| YamcliError::Io(format!("{} has no parent directory", path.display())))?;
     fs::create_dir_all(parent)?;
     harden_config_dir(parent)?;
 
@@ -19,7 +19,7 @@ pub fn write_config_file(path: &Path, contents: &str) -> Result<()> {
     temp.as_file_mut().sync_all()?;
     harden_file_permissions(temp.path())?;
     temp.persist(path)
-        .map_err(|err| YacliError::Io(err.to_string()))?;
+        .map_err(|err| YamcliError::Io(err.to_string()))?;
     harden_file_permissions(path)?;
     sync_dir(parent)?;
     Ok(())
@@ -88,7 +88,11 @@ mod tests {
     fn write_config_file_creates_parent_directory() {
         let _guard = PERSIST_TEST_LOCK.lock().expect("persist test lock");
         let temp = tempdir().expect("tempdir");
-        let path = temp.path().join("nested").join("yacli").join("config.toml");
+        let path = temp
+            .path()
+            .join("nested")
+            .join("yamcli")
+            .join("config.toml");
 
         write_config_file(&path, "enabled = true\n").expect("save");
 

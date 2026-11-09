@@ -38,7 +38,7 @@ pub fn doctor_payload(requested_account: Option<&str>, goal: Option<&str>) -> Re
             "Конфиг аккаунтов",
             accounts_path.exists(),
             format!("Путь: {}", accounts_path.display()),
-            "yacli setup me@yandex.ru",
+            "yamcli setup me@yandex.ru",
         ),
         file_check(
             "activity_log",
@@ -49,7 +49,7 @@ pub fn doctor_payload(requested_account: Option<&str>, goal: Option<&str>) -> Re
                 activity_log_path.display(),
                 activity_store.entries().len()
             ),
-            "yacli activity list",
+            "yamcli activity list",
         ),
         secret_backend_check(secret_backend, credentials_path.exists()),
         mcp_local_paths_check(),
@@ -88,21 +88,21 @@ pub fn doctor_payload(requested_account: Option<&str>, goal: Option<&str>) -> Re
             "Почта",
             mail.credential_state,
             &mail.detail,
-            "yacli login",
+            "yamcli login",
         ));
         checks.push(service_check(
             "calendar",
             "Календарь",
             calendar.credential_state,
             &calendar.detail,
-            "yacli login calendar --app-password <пароль>",
+            "yamcli login calendar --app-password <пароль>",
         ));
         checks.push(service_check(
             "disk",
             "Диск",
             disk.credential_state,
             &disk.detail,
-            "yacli login",
+            "yamcli login",
         ));
 
         let connected = [
@@ -124,7 +124,7 @@ pub fn doctor_payload(requested_account: Option<&str>, goal: Option<&str>) -> Re
             } else {
                 "Сначала подключите хотя бы Почту, Диск или Календарь."
             },
-            "recommended_command": "yacli workflow list"
+            "recommended_command": "yamcli workflow list"
         }));
 
         current_account = json!(account_name);
@@ -214,9 +214,9 @@ fn secret_backend_check(secret_backend: &str, credentials_file_present: bool) ->
             detail
         },
         "recommended_command": if secret_backend == "file" {
-            "unset YACLI_SECRET_BACKEND"
+            "unset YAMCLI_SECRET_BACKEND"
         } else {
-            "yacli status"
+            "yamcli status"
         },
     })
 }
@@ -231,7 +231,7 @@ fn mcp_local_paths_check() -> Value {
                 "MCP-инструменты могут читать и писать файлы только внутри: {}",
                 paths.join(", ")
             ),
-            "recommended_command": "yacli doctor",
+            "recommended_command": "yamcli doctor",
         }),
         None => json!({
             "id": "mcp_local_paths",
@@ -240,7 +240,7 @@ fn mcp_local_paths_check() -> Value {
             "detail": format!(
                 "{ALLOWED_PATHS_ENV} не задан: MCP-инструменты не имеют доступа к локальным файлам (attachments, disk upload/download, attachment export). Это безопасное значение по умолчанию; задайте переменную, если агенту нужны файлы."
             ),
-            "recommended_command": "export YACLI_MCP_ALLOWED_PATHS=\"$HOME/Downloads\"",
+            "recommended_command": "export YAMCLI_MCP_ALLOWED_PATHS=\"$HOME/Downloads\"",
         }),
     }
 }
@@ -287,9 +287,9 @@ fn mcp_install_check(clients: &[crate::mcp::install::ClientReadiness]) -> Value 
             .map(|client| client.client)
             .collect::<Vec<_>>()
             .join(", ");
-        format!("yacli уже зарегистрирован в следующих клиентах: {names}")
+        format!("yamcli уже зарегистрирован в следующих клиентах: {names}")
     } else if available > 0 {
-        "Совместимые MCP-клиенты обнаружены, но yacli ещё не зарегистрирован ни в одном из них."
+        "Совместимые MCP-клиенты обнаружены, но yamcli ещё не зарегистрирован ни в одном из них."
             .to_string()
     } else {
         "Совместимые MCP-клиенты не обнаружены локально. Можно продолжать через CLI или поднять HTTP/stdio MCP вручную."
@@ -307,7 +307,7 @@ fn mcp_install_check(clients: &[crate::mcp::install::ClientReadiness]) -> Value 
             "attention"
         },
         "detail": detail,
-        "recommended_command": "yacli mcp install --client claude",
+        "recommended_command": "yamcli mcp install --client claude",
     })
 }
 

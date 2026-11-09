@@ -10,11 +10,11 @@ use sha2::{Digest, Sha256};
 use url::Url;
 
 use crate::credential_store::StoredOauthCredential;
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 
 pub const DEFAULT_OAUTH_BASE_URL: &str = "https://oauth.yandex.ru";
 pub const DEFAULT_REDIRECT_URI: &str = "https://oauth.yandex.ru/verification_code";
-pub const DEFAULT_YACLI_CLIENT_ID: &str = "babbe3ab2e254d5abee427890e2a5a8f";
+pub const DEFAULT_YAMCLI_CLIENT_ID: &str = "babbe3ab2e254d5abee427890e2a5a8f";
 pub const DISK_SCOPES: &[&str] = &[
     "cloud_api:disk.app_folder",
     "cloud_api:disk.info",
@@ -74,11 +74,11 @@ pub struct LoginResult {
 }
 
 pub fn oauth_base_url() -> String {
-    std::env::var("YACLI_OAUTH_BASE_URL").unwrap_or_else(|_| DEFAULT_OAUTH_BASE_URL.to_string())
+    std::env::var("YAMCLI_OAUTH_BASE_URL").unwrap_or_else(|_| DEFAULT_OAUTH_BASE_URL.to_string())
 }
 
-pub const fn default_yacli_client_id() -> &'static str {
-    DEFAULT_YACLI_CLIENT_ID
+pub const fn default_yamcli_client_id() -> &'static str {
+    DEFAULT_YAMCLI_CLIENT_ID
 }
 
 pub fn start_pkce_authorization(
@@ -87,7 +87,7 @@ pub fn start_pkce_authorization(
     login_hint: Option<&str>,
 ) -> Result<AuthorizationSession> {
     if services.is_empty() {
-        return Err(YacliError::Config(
+        return Err(YamcliError::Config(
             "OAuth authorization requires at least one target service".to_string(),
         ));
     }
@@ -137,8 +137,9 @@ pub fn exchange_authorization_code(
         return Err(oauth_error(status, &body, "authorization code exchange"));
     }
 
-    let token = serde_json::from_str::<RawTokenResponse>(&body)
-        .map_err(|err| YacliError::Serialization(format!("invalid OAuth token response: {err}")))?;
+    let token = serde_json::from_str::<RawTokenResponse>(&body).map_err(|err| {
+        YamcliError::Serialization(format!("invalid OAuth token response: {err}"))
+    })?;
 
     Ok(LoginResult {
         authorization: session.request,
@@ -181,7 +182,7 @@ fn build_authorize_url(
 
 fn build_http_client() -> Result<Client> {
     Client::builder()
-        .user_agent(format!("yacli/{}", env!("CARGO_PKG_VERSION")))
+        .user_agent(format!("yamcli/{}", env!("CARGO_PKG_VERSION")))
         .timeout(Duration::from_secs(20))
         .build()
         .map_err(Into::into)
@@ -189,9 +190,9 @@ fn build_http_client() -> Result<Client> {
 
 fn oauth_endpoint(base_url: &str, path: &str) -> Result<Url> {
     Url::parse(base_url)
-        .map_err(|err| YacliError::Config(format!("invalid OAuth base URL: {err}")))?
+        .map_err(|err| YamcliError::Config(format!("invalid OAuth base URL: {err}")))?
         .join(path)
-        .map_err(|err| YacliError::Config(format!("invalid OAuth endpoint: {err}")))
+        .map_err(|err| YamcliError::Config(format!("invalid OAuth endpoint: {err}")))
 }
 
 fn deduped_scopes(services: &[OauthService]) -> Vec<&'static str> {
@@ -217,7 +218,7 @@ fn random_token(byte_len: usize) -> String {
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
-fn oauth_error(status: StatusCode, body: &str, action: &str) -> YacliError {
+fn oauth_error(status: StatusCode, body: &str, action: &str) -> YamcliError {
     let parsed = serde_json::from_str::<OauthErrorBody>(body).ok();
     let code = parsed
         .as_ref()
@@ -228,7 +229,7 @@ fn oauth_error(status: StatusCode, body: &str, action: &str) -> YacliError {
         .and_then(|value| value.error_description.as_deref())
         .unwrap_or("No provider message returned.");
 
-    YacliError::Auth(format!(
+    YamcliError::Auth(format!(
         "Yandex OAuth {} failed with status {} ({}): {}",
         action,
         status.as_u16(),

@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::account_store::AccountStore;
 use crate::credential_store::{CredentialStore, StoredCredential};
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 use crate::mail::MailSessionAuth;
 use crate::model::{AccountConfig, CalendarAuthMode, MailAuthMode};
 use crate::oauth::{OauthService, unix_timestamp_now};
@@ -85,7 +85,7 @@ pub fn auth_state(
                             CredentialState {
                                 credential_ref: Some(raw.to_string()),
                                 credential_state: "store_expired",
-                                detail: "сохраненный OAuth-токен истек или скоро истечет; выполните `yacli login` еще раз".to_string(),
+                                detail: "сохраненный OAuth-токен истек или скоро истечет; выполните `yamcli login` еще раз".to_string(),
                             }
                         }
                     }
@@ -112,7 +112,7 @@ pub fn auth_state(
 
 pub fn ensure_calendar_supports_app_password(account: &AccountConfig) -> Result<()> {
     if !matches!(account.calendar.auth_mode, CalendarAuthMode::AppPassword) {
-        return Err(YacliError::UnsupportedOperation(
+        return Err(YamcliError::UnsupportedOperation(
             "calendar login currently supports only account.calendar.auth_mode=app_password"
                 .to_string(),
         ));
@@ -211,7 +211,7 @@ pub fn resolve_oauth_access_token(
     service: OauthService,
 ) -> Result<String> {
     let Some(reference) = reference else {
-        return Err(YacliError::Auth(format!(
+        return Err(YamcliError::Auth(format!(
             "{} has no credential configured for {}",
             account_name,
             service.as_str()
@@ -222,7 +222,7 @@ pub fn resolve_oauth_access_token(
         Some(CredentialReference::Env(var_name)) => required_env(var_name),
         Some(CredentialReference::Store(store_service)) => {
             if store_service != service.as_str() {
-                return Err(YacliError::Config(format!(
+                return Err(YamcliError::Config(format!(
                     "credential_ref {} does not match requested service {}",
                     reference,
                     service.as_str()
@@ -233,7 +233,7 @@ pub fn resolve_oauth_access_token(
             let stored = credential_store
                 .get_oauth(account_name, service.as_str())
                 .ok_or_else(|| {
-                    YacliError::Auth(format!(
+                    YamcliError::Auth(format!(
                         "no stored OAuth credential for account {} service {}",
                         account_name,
                         service.as_str()
@@ -241,8 +241,8 @@ pub fn resolve_oauth_access_token(
                 })?;
 
             if stored.expires_at_epoch_secs <= unix_timestamp_now().saturating_add(60) {
-                return Err(YacliError::Auth(format!(
-                    "stored OAuth token expired for account {} service {}; run `yacli login --account {}` again",
+                return Err(YamcliError::Auth(format!(
+                    "stored OAuth token expired for account {} service {}; run `yamcli login --account {}` again",
                     account_name,
                     service.as_str(),
                     account_name
@@ -251,7 +251,7 @@ pub fn resolve_oauth_access_token(
 
             Ok(stored.access_token.clone())
         }
-        None => Err(YacliError::Config(format!(
+        None => Err(YamcliError::Config(format!(
             "unsupported credential_ref format: {reference}"
         ))),
     }
@@ -263,7 +263,7 @@ pub fn resolve_app_password_secret(
     reference: Option<&str>,
 ) -> Result<String> {
     let Some(reference) = reference else {
-        return Err(YacliError::Auth(format!(
+        return Err(YamcliError::Auth(format!(
             "{account_name} has no credential configured for {service} app password"
         )));
     };
@@ -272,7 +272,7 @@ pub fn resolve_app_password_secret(
         Some(CredentialReference::Env(var_name)) => required_env(var_name),
         Some(CredentialReference::Store(store_service)) => {
             if store_service != service {
-                return Err(YacliError::Config(format!(
+                return Err(YamcliError::Config(format!(
                     "credential_ref {} does not match requested service {}",
                     reference, service
                 )));
@@ -282,14 +282,14 @@ pub fn resolve_app_password_secret(
             let stored = credential_store
                 .get_app_password(account_name, service)
                 .ok_or_else(|| {
-                    YacliError::Auth(format!(
+                    YamcliError::Auth(format!(
                         "no stored app password for account {} service {}",
                         account_name, service
                     ))
                 })?;
             Ok(stored.secret.clone())
         }
-        None => Err(YacliError::Config(format!(
+        None => Err(YamcliError::Config(format!(
             "unsupported credential_ref format: {reference}"
         ))),
     }
@@ -297,7 +297,7 @@ pub fn resolve_app_password_secret(
 
 fn required_env(name: &str) -> Result<String> {
     std::env::var(name).map_err(|_| {
-        YacliError::Config(format!("required environment variable is missing: {name}"))
+        YamcliError::Config(format!("required environment variable is missing: {name}"))
     })
 }
 

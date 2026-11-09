@@ -13,12 +13,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use url::Url;
 
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 
 pub const DEFAULT_DISK_BASE_URL: &str = "https://cloud-api.yandex.net";
 const DEFAULT_HTTP_TIMEOUT_SECS: u64 = 20;
-const DISK_UPLOAD_TIMEOUT_ENV: &str = "YACLI_DISK_UPLOAD_TIMEOUT_SECS";
-const DISK_DOWNLOAD_TIMEOUT_ENV: &str = "YACLI_DISK_DOWNLOAD_TIMEOUT_SECS";
+const DISK_UPLOAD_TIMEOUT_ENV: &str = "YAMCLI_DISK_UPLOAD_TIMEOUT_SECS";
+const DISK_DOWNLOAD_TIMEOUT_ENV: &str = "YAMCLI_DISK_DOWNLOAD_TIMEOUT_SECS";
 const TRANSFER_PROGRESS_INTERVAL_MS: u128 = 250;
 const TRANSFER_RETRY_ATTEMPTS: usize = 3;
 const TRANSFER_RETRY_BACKOFF_MS: u64 = 400;
@@ -311,14 +311,14 @@ pub fn download_public_resource_with_progress(
     )?;
 
     if resource.resource_type != "file" {
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "public download requires a file resource, got {}",
             resource.resource_type
         )));
     }
 
     let download_url = resource.download_url.clone().ok_or_else(|| {
-        YacliError::Api(
+        YamcliError::Api(
             "public resource does not expose a download URL; downloads may be disabled".to_string(),
         )
     })?;
@@ -354,7 +354,7 @@ pub fn fetch_disk_info(base_url: &str, access_token: &str) -> Result<DiskInfo> {
     }
 
     let raw = serde_json::from_str::<RawDiskInfo>(&body)
-        .map_err(|err| YacliError::Serialization(format!("invalid provider response: {err}")))?;
+        .map_err(|err| YamcliError::Serialization(format!("invalid provider response: {err}")))?;
     Ok(raw.into_disk_info())
 }
 
@@ -364,12 +364,12 @@ pub fn fetch_private_resource(
     request: &PrivateDiskListRequest,
 ) -> Result<DiskResource> {
     if request.limit == 0 {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk list --limit должен быть больше нуля".to_string(),
         ));
     }
     if request.path.trim().is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk list [PATH] не должен быть пустым".to_string(),
         ));
     }
@@ -393,7 +393,7 @@ pub fn fetch_private_resource(
     }
 
     let raw = serde_json::from_str::<RawDiskResource>(&body)
-        .map_err(|err| YacliError::Serialization(format!("invalid provider response: {err}")))?;
+        .map_err(|err| YamcliError::Serialization(format!("invalid provider response: {err}")))?;
     Ok(raw.into_disk_resource())
 }
 
@@ -404,7 +404,7 @@ pub fn create_private_directory(
 ) -> Result<DiskResource> {
     let path = request.path.trim();
     if path.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk mkdir <PATH> не должен быть пустым".to_string(),
         ));
     }
@@ -441,7 +441,7 @@ pub fn publish_private_resource(
 ) -> Result<DiskResource> {
     let path = request.path.trim();
     if path.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk publish <PATH> не должен быть пустым".to_string(),
         ));
     }
@@ -481,7 +481,7 @@ pub fn review_private_publish(
 ) -> Result<DiskPublishReview> {
     let path = request.path.trim();
     if path.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk publish <PATH> не должен быть пустым".to_string(),
         ));
     }
@@ -513,7 +513,7 @@ pub fn unpublish_private_resource(
 ) -> Result<UnpublishedDiskResource> {
     let path = request.path.trim();
     if path.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk unpublish <PATH> не должен быть пустым".to_string(),
         ));
     }
@@ -579,7 +579,7 @@ pub fn review_private_unpublish(
 ) -> Result<DiskUnpublishReview> {
     let path = request.path.trim();
     if path.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk unpublish <PATH> не должен быть пустым".to_string(),
         ));
     }
@@ -632,7 +632,7 @@ fn upload_private_resource_attempt(
 ) -> Result<(DiskResource, UploadedFile)> {
     let remote_path = request.path.trim();
     if remote_path.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk upload <PATH> не должен быть пустым".to_string(),
         ));
     }
@@ -664,10 +664,10 @@ fn upload_private_resource_attempt(
     }
 
     let ticket = serde_json::from_str::<RawUploadTicket>(&body)
-        .map_err(|err| YacliError::Serialization(format!("invalid provider response: {err}")))?;
+        .map_err(|err| YamcliError::Serialization(format!("invalid provider response: {err}")))?;
 
     if !ticket.method.eq_ignore_ascii_case("PUT") {
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "Yandex Disk upload ticket requested unsupported method {}",
             ticket.method
         )));
@@ -684,13 +684,13 @@ fn upload_private_resource_attempt(
         .send()
         .map_err(|err| {
             if err.is_timeout() && upload_timeout.is_some() {
-                YacliError::Network(format!(
+                YamcliError::Network(format!(
                     "Yandex Disk upload timed out after configured ceiling {}s while sending {}",
                     upload_timeout.unwrap_or_default().as_secs(),
                     request.source.display()
                 ))
             } else {
-                YacliError::from(err)
+                YamcliError::from(err)
             }
         })?;
     let upload_status = upload_response.status();
@@ -730,7 +730,7 @@ fn upload_private_resource_attempt(
 pub fn review_private_upload(request: &PrivateDiskUploadRequest) -> Result<DiskUploadReview> {
     let remote_path = request.path.trim();
     if remote_path.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk upload <PATH> не должен быть пустым".to_string(),
         ));
     }
@@ -761,7 +761,7 @@ pub fn download_private_resource_with_progress(
 ) -> Result<(DiskResource, DownloadedFile)> {
     let remote_path = request.path.trim();
     if remote_path.is_empty() {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk download <PATH> не должен быть пустым".to_string(),
         ));
     }
@@ -776,7 +776,7 @@ pub fn download_private_resource_with_progress(
         },
     )?;
     if resource.resource_type != "file" {
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "private download requires a file resource, got {}",
             resource.resource_type
         )));
@@ -802,9 +802,9 @@ pub fn download_private_resource_with_progress(
     }
 
     let ticket = serde_json::from_str::<RawDownloadTicket>(&body)
-        .map_err(|err| YacliError::Serialization(format!("invalid provider response: {err}")))?;
+        .map_err(|err| YamcliError::Serialization(format!("invalid provider response: {err}")))?;
     if !ticket.method.eq_ignore_ascii_case("GET") {
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "Yandex Disk download ticket requested unsupported method {}",
             ticket.method
         )));
@@ -847,7 +847,7 @@ fn fetch_public_resource_with_client(
     }
 
     let raw = serde_json::from_str::<RawPublicResource>(&body)
-        .map_err(|err| YacliError::Serialization(format!("invalid provider response: {err}")))?;
+        .map_err(|err| YamcliError::Serialization(format!("invalid provider response: {err}")))?;
     Ok(raw.into_public_resource())
 }
 
@@ -860,11 +860,11 @@ fn download_to_path(
     progress: Option<TransferProgressCallback>,
 ) -> Result<DownloadedFile> {
     if output.exists() && !force {
-        return Err(YacliError::OutputExists(output.display().to_string()));
+        return Err(YamcliError::OutputExists(output.display().to_string()));
     }
 
     if output.is_dir() {
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "output path points to a directory: {}",
             output.display()
         )));
@@ -894,7 +894,7 @@ fn download_to_path(
     let (mut response, mut bytes_written, mut hasher) = if status == StatusCode::PARTIAL_CONTENT {
         let (existing_bytes, existing_hasher) = analyze_existing_partial(&partial_path)?;
         if existing_bytes != resumed_from_bytes {
-            return Err(YacliError::Integrity(format!(
+            return Err(YamcliError::Integrity(format!(
                 "partial download size changed during resume: expected {}, got {}",
                 resumed_from_bytes, existing_bytes
             )));
@@ -921,12 +921,12 @@ fn download_to_path(
                 elapsed_ms: 0,
             });
         }
-        return Err(YacliError::Api(format!(
+        return Err(YamcliError::Api(format!(
             "Yandex Disk download resume failed with status {}",
             status.as_u16()
         )));
     } else {
-        return Err(YacliError::Api(format!(
+        return Err(YamcliError::Api(format!(
             "Yandex Disk download failed with status {}",
             status.as_u16()
         )));
@@ -960,7 +960,7 @@ fn download_to_path(
     if let Some(expected_size) = expected_size
         && bytes_written != expected_size
     {
-        return Err(YacliError::Integrity(format!(
+        return Err(YamcliError::Integrity(format!(
             "downloaded byte count mismatch: expected {}, got {}",
             expected_size, bytes_written
         )));
@@ -1010,7 +1010,7 @@ fn apply_transfer_stats<T: TransferStatTarget>(value: &mut T, attempts: usize, e
 
 fn build_http_client() -> Result<Client> {
     Client::builder()
-        .user_agent(format!("yacli/{}", env!("CARGO_PKG_VERSION")))
+        .user_agent(format!("yamcli/{}", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(DEFAULT_HTTP_TIMEOUT_SECS))
         .timeout(Duration::from_secs(DEFAULT_HTTP_TIMEOUT_SECS))
         .build()
@@ -1019,7 +1019,7 @@ fn build_http_client() -> Result<Client> {
 
 fn build_transfer_http_client(timeout: Option<Duration>) -> Result<Client> {
     let mut builder = Client::builder()
-        .user_agent(format!("yacli/{}", env!("CARGO_PKG_VERSION")))
+        .user_agent(format!("yamcli/{}", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(DEFAULT_HTTP_TIMEOUT_SECS));
     if let Some(timeout) = timeout {
         builder = builder.timeout(timeout);
@@ -1054,7 +1054,7 @@ fn parse_transfer_timeout_env(
         return Ok(None);
     }
     let seconds = u64::from_str(trimmed).map_err(|_| {
-        YacliError::Config(format!(
+        YamcliError::Config(format!(
             "{env_name} must be a positive integer number of seconds"
         ))
     })?;
@@ -1164,10 +1164,10 @@ impl TransferStatTarget for (DiskResource, UploadedFile) {
     }
 }
 
-fn is_retryable_transfer_error(err: &YacliError) -> bool {
+fn is_retryable_transfer_error(err: &YamcliError) -> bool {
     match err {
-        YacliError::Network(_) => true,
-        YacliError::Io(message) => {
+        YamcliError::Network(_) => true,
+        YamcliError::Io(message) => {
             let lower = message.to_ascii_lowercase();
             lower.contains("timed out")
                 || lower.contains("connection reset")
@@ -1175,7 +1175,7 @@ fn is_retryable_transfer_error(err: &YacliError) -> bool {
                 || lower.contains("unexpected eof")
                 || lower.contains("broken pipe")
         }
-        YacliError::Api(message) => {
+        YamcliError::Api(message) => {
             message.contains("status 500")
                 || message.contains("status 502")
                 || message.contains("status 503")
@@ -1199,7 +1199,7 @@ fn existing_partial_len(path: &Path) -> Result<u64> {
     }
     let metadata = fs::metadata(path)?;
     if !metadata.is_file() {
-        return Err(YacliError::UnsupportedOperation(format!(
+        return Err(YamcliError::UnsupportedOperation(format!(
             "partial download path points to a directory: {}",
             path.display()
         )));
@@ -1233,54 +1233,54 @@ fn finalize_partial_download(partial_path: &Path, output: &Path, force: bool) ->
 
 fn public_resource_endpoint(base_url: &str) -> Result<Url> {
     Url::parse(base_url)
-        .map_err(|err| YacliError::Config(format!("invalid disk base URL: {err}")))?
+        .map_err(|err| YamcliError::Config(format!("invalid disk base URL: {err}")))?
         .join("/v1/disk/public/resources")
-        .map_err(|err| YacliError::Config(format!("invalid disk endpoint: {err}")))
+        .map_err(|err| YamcliError::Config(format!("invalid disk endpoint: {err}")))
 }
 
 fn disk_resources_endpoint(base_url: &str) -> Result<Url> {
     Url::parse(base_url)
-        .map_err(|err| YacliError::Config(format!("invalid disk base URL: {err}")))?
+        .map_err(|err| YamcliError::Config(format!("invalid disk base URL: {err}")))?
         .join("/v1/disk/resources")
-        .map_err(|err| YacliError::Config(format!("invalid disk endpoint: {err}")))
+        .map_err(|err| YamcliError::Config(format!("invalid disk endpoint: {err}")))
 }
 
 fn disk_upload_endpoint(base_url: &str) -> Result<Url> {
     Url::parse(base_url)
-        .map_err(|err| YacliError::Config(format!("invalid disk base URL: {err}")))?
+        .map_err(|err| YamcliError::Config(format!("invalid disk base URL: {err}")))?
         .join("/v1/disk/resources/upload")
-        .map_err(|err| YacliError::Config(format!("invalid disk endpoint: {err}")))
+        .map_err(|err| YamcliError::Config(format!("invalid disk endpoint: {err}")))
 }
 
 fn disk_download_endpoint(base_url: &str) -> Result<Url> {
     Url::parse(base_url)
-        .map_err(|err| YacliError::Config(format!("invalid disk base URL: {err}")))?
+        .map_err(|err| YamcliError::Config(format!("invalid disk base URL: {err}")))?
         .join("/v1/disk/resources/download")
-        .map_err(|err| YacliError::Config(format!("invalid disk endpoint: {err}")))
+        .map_err(|err| YamcliError::Config(format!("invalid disk endpoint: {err}")))
 }
 
 fn disk_publish_endpoint(base_url: &str) -> Result<Url> {
     Url::parse(base_url)
-        .map_err(|err| YacliError::Config(format!("invalid disk base URL: {err}")))?
+        .map_err(|err| YamcliError::Config(format!("invalid disk base URL: {err}")))?
         .join("/v1/disk/resources/publish")
-        .map_err(|err| YacliError::Config(format!("invalid disk endpoint: {err}")))
+        .map_err(|err| YamcliError::Config(format!("invalid disk endpoint: {err}")))
 }
 
 fn disk_unpublish_endpoint(base_url: &str) -> Result<Url> {
     Url::parse(base_url)
-        .map_err(|err| YacliError::Config(format!("invalid disk base URL: {err}")))?
+        .map_err(|err| YamcliError::Config(format!("invalid disk base URL: {err}")))?
         .join("/v1/disk/resources/unpublish")
-        .map_err(|err| YacliError::Config(format!("invalid disk endpoint: {err}")))
+        .map_err(|err| YamcliError::Config(format!("invalid disk endpoint: {err}")))
 }
 
 fn disk_info_endpoint(base_url: &str) -> Result<Url> {
     Url::parse(base_url)
-        .map_err(|err| YacliError::Config(format!("invalid disk base URL: {err}")))?
+        .map_err(|err| YamcliError::Config(format!("invalid disk base URL: {err}")))?
         .join("/v1/disk")
-        .map_err(|err| YacliError::Config(format!("invalid disk endpoint: {err}")))
+        .map_err(|err| YamcliError::Config(format!("invalid disk endpoint: {err}")))
 }
 
-fn provider_error(status: StatusCode, body: &str, surface: &str, action: &str) -> YacliError {
+fn provider_error(status: StatusCode, body: &str, surface: &str, action: &str) -> YamcliError {
     let parsed = serde_json::from_str::<ProviderError>(body).ok();
     let provider_code = parsed
         .as_ref()
@@ -1291,7 +1291,7 @@ fn provider_error(status: StatusCode, body: &str, surface: &str, action: &str) -
         .and_then(|value| value.message.as_deref())
         .unwrap_or("No provider message returned.");
 
-    YacliError::Api(format!(
+    YamcliError::Api(format!(
         "Yandex Disk {surface} {action} request failed with status {} ({}): {}",
         status.as_u16(),
         provider_code,
@@ -1299,14 +1299,14 @@ fn provider_error(status: StatusCode, body: &str, surface: &str, action: &str) -
     ))
 }
 
-fn upload_target_error(status: StatusCode, body: &str) -> YacliError {
+fn upload_target_error(status: StatusCode, body: &str) -> YamcliError {
     if body.trim().is_empty() {
-        YacliError::Api(format!(
+        YamcliError::Api(format!(
             "Yandex Disk upload target request failed with status {}",
             status.as_u16()
         ))
     } else {
-        YacliError::Api(format!(
+        YamcliError::Api(format!(
             "Yandex Disk upload target request failed with status {}: {}",
             status.as_u16(),
             body.trim()
@@ -1317,21 +1317,21 @@ fn upload_target_error(status: StatusCode, body: &str) -> YacliError {
 fn analyze_upload_source(path: &Path) -> Result<UploadSourceMeta> {
     let metadata = fs::metadata(path).map_err(|err| {
         if err.kind() == std::io::ErrorKind::NotFound {
-            YacliError::Validation(format!("disk upload: файл не найден: {}", path.display()))
+            YamcliError::Validation(format!("disk upload: файл не найден: {}", path.display()))
         } else {
-            YacliError::Io(err.to_string())
+            YamcliError::Io(err.to_string())
         }
     })?;
 
     if !metadata.is_file() {
-        return Err(YacliError::Validation(format!(
+        return Err(YamcliError::Validation(format!(
             "disk upload: путь должен указывать на файл: {}",
             path.display()
         )));
     }
 
     if metadata.len() == 0 {
-        return Err(YacliError::Validation(
+        return Err(YamcliError::Validation(
             "disk upload: файл не должен быть пустым".to_string(),
         ));
     }
@@ -1392,7 +1392,7 @@ mod tests {
         PrivateDiskUploadRequest, ProgressReader, TransferProgress, is_retryable_transfer_error,
         parse_transfer_timeout_env, review_private_upload,
     };
-    use crate::error::YacliError;
+    use crate::error::YamcliError;
 
     #[test]
     fn review_private_upload_reports_file_metadata_without_network() {
@@ -1515,23 +1515,23 @@ mod tests {
 
     #[test]
     fn retryable_transfer_error_accepts_transient_network_and_io_failures() {
-        assert!(is_retryable_transfer_error(&YacliError::Network(
+        assert!(is_retryable_transfer_error(&YamcliError::Network(
             "request timed out".to_string()
         )));
-        assert!(is_retryable_transfer_error(&YacliError::Io(
+        assert!(is_retryable_transfer_error(&YamcliError::Io(
             "connection reset by peer".to_string()
         )));
-        assert!(is_retryable_transfer_error(&YacliError::Api(
+        assert!(is_retryable_transfer_error(&YamcliError::Api(
             "Yandex Disk upload target request failed with status 503".to_string()
         )));
     }
 
     #[test]
     fn retryable_transfer_error_rejects_validation_and_non_transient_api_failures() {
-        assert!(!is_retryable_transfer_error(&YacliError::Validation(
+        assert!(!is_retryable_transfer_error(&YamcliError::Validation(
             "disk upload <PATH> не должен быть пустым".to_string()
         )));
-        assert!(!is_retryable_transfer_error(&YacliError::Api(
+        assert!(!is_retryable_transfer_error(&YamcliError::Api(
             "Yandex Disk upload target request failed with status 409".to_string()
         )));
     }

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>yacli MCP Dashboard</title>
+    <title>yamcli MCP Dashboard</title>
     <style>
       :root {
         color-scheme: light;
@@ -509,11 +509,11 @@
           <div class="headline">
             <span class="eyebrow">MCP Apps Runtime</span>
           </div>
-          <h1>yacli dashboard for host-aware workflows.</h1>
+          <h1>yamcli dashboard for host-aware workflows.</h1>
           <p>
             This view speaks the MCP Apps postMessage lifecycle directly. It
             initializes against the host, reacts to tool input and tool result
-            notifications, and can invoke yacli tools from inside the app.
+            notifications, and can invoke yamcli tools from inside the app.
           </p>
           <div class="hero-grid">
             <div class="metric">
@@ -575,7 +575,7 @@
           <article class="card toolbox" id="panel-tools">
             <div class="panel-header">
               <div>
-                <h2>Run yacli tools</h2>
+                <h2>Run yamcli tools</h2>
                 <p class="panel-note">
                   These calls go through the host via MCP Apps transport.
                 </p>
@@ -588,7 +588,7 @@
               </div>
               <div>
                 <label class="field-label" for="tool-name-input">Tool name</label>
-                <input id="tool-name-input" name="tool-name" placeholder="yacli.mail.list" autocomplete="off">
+                <input id="tool-name-input" name="tool-name" placeholder="yamcli.mail.list" autocomplete="off">
               </div>
               <div>
                 <label class="field-label" for="tool-args-input">Tool args JSON</label>
@@ -600,11 +600,11 @@
                 >
               </div>
               <div class="actions">
-                <button id="action-app-snapshot" data-tool="yacli.app.snapshot">Refresh snapshot</button>
-                <button id="action-account-list" data-tool="yacli.account.list">List accounts</button>
-                <button id="action-account-current" class="secondary" data-tool="yacli.account.current">Current account</button>
-                <button id="action-auth-status" class="secondary" data-tool="yacli.auth.status">Auth status</button>
-                <button id="action-update-check" class="secondary" data-tool="yacli.update.check">Check updates</button>
+                <button id="action-app-snapshot" data-tool="yamcli.app.snapshot">Refresh snapshot</button>
+                <button id="action-account-list" data-tool="yamcli.account.list">List accounts</button>
+                <button id="action-account-current" class="secondary" data-tool="yamcli.account.current">Current account</button>
+                <button id="action-auth-status" class="secondary" data-tool="yamcli.auth.status">Auth status</button>
+                <button id="action-update-check" class="secondary" data-tool="yamcli.update.check">Check updates</button>
                 <button id="action-preview-selected-tool" class="secondary">Preview action</button>
                 <button id="action-apply-reviewed-tool" class="secondary">Apply reviewed action</button>
                 <button id="action-open-tool-remediation" class="secondary">Open suggested flow</button>
@@ -634,7 +634,7 @@
               <button id="action-share-view" class="secondary">Share current view</button>
               <button id="action-open-docs" class="secondary">Open MCP Apps docs</button>
             </div>
-            <div id="current-view-uri" class="uri-chip">ui://yacli/dashboard</div>
+            <div id="current-view-uri" class="uri-chip">ui://yamcli/dashboard</div>
           </article>
 
           <article class="card" id="panel-events">
@@ -820,7 +820,7 @@
               <div>
                 <h2>Searchable browser</h2>
                 <p class="panel-note">
-                  Unified search across yacli tools, workflows, prompts, resources, templates, and embedded skills.
+                  Unified search across yamcli tools, workflows, prompts, resources, templates, and embedded skills.
                 </p>
               </div>
             </div>
@@ -926,7 +926,7 @@
               <div>
                 <h2>Resource inspector</h2>
                 <p class="panel-note">
-                  Reads templated yacli resources through the host MCP bridge.
+                  Reads templated yamcli resources through the host MCP bridge.
                 </p>
               </div>
             </div>
@@ -938,7 +938,7 @@
             </div>
             <div style="margin-top: 12px;">
               <label class="field-label" for="skill-input">Skill name</label>
-              <input id="skill-input" name="skill" placeholder="yacli-mail" autocomplete="off">
+              <input id="skill-input" name="skill" placeholder="yamcli-mail" autocomplete="off">
             </div>
             <div class="json-frame" style="margin-top: 14px;">
               <pre id="resource-templates-json">No resource templates fetched yet.</pre>
@@ -971,21 +971,21 @@
 
       <div class="footer">
         <span id="transport-hint">Transport: waiting for postMessage bridge</span>
-        <span id="current-view-summary">View: ui://yacli/dashboard</span>
+        <span id="current-view-summary">View: ui://yamcli/dashboard</span>
         <span>Lifecycle: ui/initialize -> ui/notifications/initialized -> tools/call</span>
       </div>
     </main>
 
     <script>
       (function () {
-        const APP_RESOURCE_URI = "ui://yacli/dashboard";
+        const APP_RESOURCE_URI = "ui://yamcli/dashboard";
         const APP_RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
         const APP_PROTOCOL_VERSION = "2025-11-25";
-        const APP_INFO = { name: "yacli-dashboard", version: "__YACLI_VERSION__" };
-        const DASHBOARD_TOOL_GOAL_ROUTE = "yacli.goal.route";
-        const APP_BOOTSTRAP = __YACLI_BOOTSTRAP__;
-        const APP_VIEW_STATE_STORAGE_KEY = "yacli.mcp.dashboard.view-state.v1";
-        const APP_RUNTIME_STATE_STORAGE_KEY = "yacli.mcp.dashboard.runtime-state.v1";
+        const APP_INFO = { name: "yamcli-dashboard", version: "__YAMCLI_VERSION__" };
+        const DASHBOARD_TOOL_GOAL_ROUTE = "yamcli.goal.route";
+        const APP_BOOTSTRAP = __YAMCLI_BOOTSTRAP__;
+        const APP_VIEW_STATE_STORAGE_KEY = "yamcli.mcp.dashboard.view-state.v1";
+        const APP_RUNTIME_STATE_STORAGE_KEY = "yamcli.mcp.dashboard.runtime-state.v1";
 
         function sanitizeBootstrapState(value) {
           const source = value && typeof value === "object" ? value : {};
@@ -2441,21 +2441,21 @@
 
           switch (workflowId) {
             case "daily-briefing":
-              return "yacli.mail.list";
+              return "yamcli.mail.list";
             case "reply-with-context":
-              return "yacli.mail.reply";
+              return "yamcli.mail.reply";
             case "attachment-to-disk":
-              return "yacli.mail.attachment.export";
+              return "yamcli.mail.attachment.export";
             case "send-file-by-mail":
-              return "yacli.mail.send";
+              return "yamcli.mail.send";
             case "send-link-by-mail":
-              return "yacli.mail.send_link";
+              return "yamcli.mail.send_link";
             case "publish-file-link":
-              return "yacli.disk.upload_link";
+              return "yamcli.disk.upload_link";
             case "revoke-public-link":
-              return "yacli.disk.unpublish";
+              return "yamcli.disk.unpublish";
             case "invite-to-calendar":
-              return "yacli.mail.invite.create_event";
+              return "yamcli.mail.invite.create_event";
             default:
               return toolNames[0] || "";
           }
@@ -2527,7 +2527,7 @@
         }
 
         function toolNameToOperation(toolName) {
-          return String(toolName || "").replace(/^yacli\./, "");
+          return String(toolName || "").replace(/^yamcli\./, "");
         }
 
         function latestWorkflowActivity() {
@@ -2761,7 +2761,7 @@
         }
 
         function selectTool(toolName, preserveArguments) {
-          const nextTool = toolName || "yacli.app.snapshot";
+          const nextTool = toolName || "yamcli.app.snapshot";
           elements.toolNameInput.value = nextTool;
           state.bootstrap.preferredTool = nextTool;
           if (!preserveArguments) {
@@ -3061,22 +3061,22 @@
               await renderSelectedPrompt();
               break;
             case "resource":
-              if (item.name === "resource://yacli/workflows") {
+              if (item.name === "resource://yamcli/workflows") {
                 focusPanel("panel-workflows");
                 await listWorkflows();
                 return;
               }
-              if (item.name === "resource://yacli/activity") {
+              if (item.name === "resource://yamcli/activity") {
                 focusPanel("panel-activity");
                 await listActivity();
                 return;
               }
-              if (item.name === "resource://yacli/skills") {
+              if (item.name === "resource://yamcli/skills") {
                 focusPanel("panel-resources");
                 readSkillsCatalog();
                 return;
               }
-              if (item.name === "ui://yacli/dashboard") {
+              if (item.name === "ui://yamcli/dashboard") {
                 focusPanel("panel-browser");
                 logEvent("browser", "dashboard resource is already open");
                 return;
@@ -3086,16 +3086,16 @@
               break;
             case "template":
               focusPanel("panel-resources");
-              if (item.name === "resource://yacli/account/{account}") {
+              if (item.name === "resource://yamcli/account/{account}") {
                 readAccountResource();
-              } else if (item.name === "resource://yacli/auth/{account}") {
+              } else if (item.name === "resource://yamcli/auth/{account}") {
                 readAuthResource();
-              } else if (item.name === "resource://yacli/skill/{skill}") {
+              } else if (item.name === "resource://yamcli/skill/{skill}") {
                 readSkillResource();
-              } else if (item.name === "resource://yacli/workflow/{workflow}") {
+              } else if (item.name === "resource://yamcli/workflow/{workflow}") {
                 focusPanel("panel-workflows");
                 listWorkflows();
-              } else if (item.name === "resource://yacli/activity/{activity}") {
+              } else if (item.name === "resource://yamcli/activity/{activity}") {
                 focusPanel("panel-activity");
                 listActivity();
               } else {
@@ -3430,7 +3430,7 @@
             return;
           }
 
-          const selectedTool = toolName || elements.toolNameInput.value.trim() || "yacli.app.snapshot";
+          const selectedTool = toolName || elements.toolNameInput.value.trim() || "yamcli.app.snapshot";
           let args = {};
           if (explicitArguments && typeof explicitArguments === "object") {
             args = explicitArguments;
@@ -3463,7 +3463,7 @@
               arguments: args,
             });
             if (
-              selectedTool === "yacli.app.snapshot" &&
+              selectedTool === "yamcli.app.snapshot" &&
               result &&
               typeof result === "object" &&
               result.structuredContent
@@ -3477,7 +3477,7 @@
             renderToolResult();
             setStatus(
               "ready",
-              selectedTool === "yacli.app.snapshot"
+              selectedTool === "yamcli.app.snapshot"
                 ? "Dashboard snapshot refreshed"
                 : selectedTool + " completed",
             );
@@ -3567,7 +3567,7 @@
           if (
             !remediation ||
             remediation.workflow !== "send-link-by-mail" ||
-            state.reviewedToolName !== "yacli.mail.send" ||
+            state.reviewedToolName !== "yamcli.mail.send" ||
             !reviewedArgs ||
             !Array.isArray(reviewedArgs.attachments) ||
             reviewedArgs.attachments.length !== 1 ||
@@ -3628,12 +3628,12 @@
             case "daily-briefing":
               break;
             case "reply-with-context":
-              if (tool === "yacli.mail.reply") {
+              if (tool === "yamcli.mail.reply") {
                 args.text = hints.quotedText || args.text || "Подтверждаю, это окно подходит";
               }
               break;
             case "attachment-to-disk":
-              if (tool === "yacli.mail.attachment.export") {
+              if (tool === "yamcli.mail.attachment.export") {
                 args.name =
                   quotedTitle && /\.[A-Za-z0-9]+$/.test(quotedTitle)
                     ? quotedTitle
@@ -3642,7 +3642,7 @@
               }
               break;
             case "send-file-by-mail":
-              if (tool === "yacli.mail.send") {
+              if (tool === "yamcli.mail.send") {
                 args.to = hints.email || args.to || "person@example.com";
                 args.subject = quotedTitle || args.subject || "Счёт";
                 args.text = args.text || "Во вложении файл";
@@ -3654,7 +3654,7 @@
               }
               break;
             case "send-link-by-mail":
-              if (tool === "yacli.mail.send_link") {
+              if (tool === "yamcli.mail.send_link") {
                 args.to = hints.email || args.to || "person@example.com";
                 args.subject = quotedTitle || args.subject || "Материалы";
                 args.text = args.text || "Отправляю ссылку";
@@ -3669,7 +3669,7 @@
               }
               break;
             case "publish-file-link":
-              if (tool === "yacli.disk.upload_link") {
+              if (tool === "yamcli.disk.upload_link") {
                 args.source = hints.localPath || args.source || "./" + inferredFilename;
                 args.path =
                   hints.diskPath ||
@@ -3680,12 +3680,12 @@
               }
               break;
             case "revoke-public-link":
-              if (tool === "yacli.disk.unpublish") {
+              if (tool === "yamcli.disk.unpublish") {
                 args.path = hints.diskPath || args.path || "disk:/docs/archive/archive.zip";
               }
               break;
             case "invite-to-calendar":
-              if (tool === "yacli.mail.invite.create_event") {
+              if (tool === "yamcli.mail.invite.create_event") {
                 args.calendar = hints.calendar || args.calendar || "team";
               }
               break;
@@ -3845,11 +3845,11 @@
           if (sendLinkArgs) {
             state.bootstrap.preferredSection = "tools";
             state.bootstrap.preferredWorkflow = workflow;
-            state.bootstrap.preferredTool = "yacli.mail.send_link";
+            state.bootstrap.preferredTool = "yamcli.mail.send_link";
             elements.workflowNameInput.value = workflow;
-            elements.toolNameInput.value = "yacli.mail.send_link";
+            elements.toolNameInput.value = "yamcli.mail.send_link";
             elements.toolArgsInput.value = safeStringify(sendLinkArgs);
-            selectTool("yacli.mail.send_link", true);
+            selectTool("yamcli.mail.send_link", true);
             renderSelectedToolSchema();
             focusPanel("panel-tools");
             renderRuntimeState();
@@ -3916,7 +3916,7 @@
             String(snapshot.currentAccount || "none") +
             "\n" +
             "---\n" +
-            "yacli dashboard snapshot:\n" +
+            "yamcli dashboard snapshot:\n" +
             (accountLines.length ? accountLines.join("\n") : "- no configured accounts")
           );
         }
@@ -3947,7 +3947,7 @@
               content: [
                 {
                   type: "text",
-                  text: "Summarize my current yacli account posture and call out missing auth.",
+                  text: "Summarize my current yamcli account posture and call out missing auth.",
                 },
               ],
             });
@@ -3975,7 +3975,7 @@
               content: [
                 {
                   type: "text",
-                  text: "Current yacli dashboard view:\n" + uri,
+                  text: "Current yamcli dashboard view:\n" + uri,
                 },
               ],
               structuredContent: {
@@ -3987,7 +3987,7 @@
               content: [
                 {
                   type: "text",
-                  text: "Open or reason about this yacli MCP Apps view: " + uri,
+                  text: "Open or reason about this yamcli MCP Apps view: " + uri,
                 },
               ],
             });
@@ -4102,7 +4102,7 @@
                 {
                   type: "text",
                   text:
-                    "Protected yacli tool requires authorization.\n" +
+                    "Protected yamcli tool requires authorization.\n" +
                     "scope: " + String(challenge.scope || "unknown") + "\n" +
                     "resource_metadata: " + String(challenge.resourceMetadataUrl || "unavailable") + "\n" +
                     "authorization_server: " + String(
@@ -4120,7 +4120,7 @@
               content: [
                 {
                   type: "text",
-                  text: "Explain how to complete authorization for this yacli MCP session.",
+                  text: "Explain how to complete authorization for this yamcli MCP session.",
                 },
               ],
             });
@@ -4140,7 +4140,7 @@
 
         function skillName() {
           const value = elements.skillInput.value.trim();
-          return value || "yacli-shared";
+          return value || "yamcli-shared";
         }
 
         function goalQuery() {
@@ -4260,7 +4260,7 @@
             const activeTool =
               elements.toolNameInput.value.trim() ||
               (state.bootstrap && state.bootstrap.preferredTool) ||
-              "yacli.app.snapshot";
+              "yamcli.app.snapshot";
             if (!elements.toolNameInput.value.trim()) {
               selectTool(activeTool, Boolean(state.toolArgumentsText));
             }
@@ -4299,7 +4299,7 @@
 
           try {
             const result = await sendRequest("resources/read", {
-              uri: "resource://yacli/workflows",
+              uri: "resource://yamcli/workflows",
             });
             state.workflowCatalogPayload = result;
             const items = workflowCatalogItems();
@@ -4325,7 +4325,7 @@
 
           try {
             const result = await sendRequest("resources/read", {
-              uri: "resource://yacli/activity",
+              uri: "resource://yamcli/activity",
             });
             state.activityCatalogPayload = result;
             const items = activityCatalogItems();
@@ -4372,7 +4372,7 @@
 
           try {
             state.skillsCatalogPayload = await sendRequest("resources/read", {
-              uri: "resource://yacli/skills",
+              uri: "resource://yamcli/skills",
             });
           } catch (error) {
             const detail = error && error.message ? error.message : String(error);
@@ -4406,7 +4406,7 @@
           state.bootstrap.preferredSection = "home";
           focusPanel("panel-home");
           setStatus("running", "Refreshing home");
-          await runTool("yacli.app.snapshot", { account: accountAlias() });
+          await runTool("yamcli.app.snapshot", { account: accountAlias() });
           await refreshHomeResource();
           await refreshWorkflowCatalog();
           await refreshActivityCatalog();
@@ -4427,8 +4427,8 @@
           const goal = goalQuery();
           const uri =
             typeof account === "string" && account.length > 0
-              ? "resource://yacli/home/" + encodeURIComponent(account)
-              : "resource://yacli/home";
+              ? "resource://yamcli/home/" + encodeURIComponent(account)
+              : "resource://yamcli/home";
           const finalUri =
             typeof goal === "string" && goal.length > 0
               ? uri + "?goal=" + encodeURIComponent(goal)
@@ -4456,8 +4456,8 @@
           const goal = goalQuery();
           const uri =
             typeof goal === "string" && goal.length > 0
-              ? "resource://yacli/onboarding?goal=" + encodeURIComponent(goal)
-              : "resource://yacli/onboarding";
+              ? "resource://yamcli/onboarding?goal=" + encodeURIComponent(goal)
+              : "resource://yamcli/onboarding";
 
           try {
             const result = await sendRequest("resources/read", {
@@ -4482,8 +4482,8 @@
           const goal = goalQuery();
           const baseUri =
             typeof account === "string" && account.length > 0
-              ? "resource://yacli/next-actions/" + encodeURIComponent(account)
-              : "resource://yacli/next-actions";
+              ? "resource://yamcli/next-actions/" + encodeURIComponent(account)
+              : "resource://yamcli/next-actions";
           const finalUri =
             typeof goal === "string" && goal.length > 0
               ? baseUri + "?goal=" + encodeURIComponent(goal)
@@ -4512,8 +4512,8 @@
           const goal = goalQuery();
           const baseUri =
             typeof account === "string" && account.length > 0
-              ? "resource://yacli/suggestions/" + encodeURIComponent(account)
-              : "resource://yacli/suggestions";
+              ? "resource://yamcli/suggestions/" + encodeURIComponent(account)
+              : "resource://yamcli/suggestions";
           const finalUri =
             typeof goal === "string" && goal.length > 0
               ? baseUri + "?goal=" + encodeURIComponent(goal)
@@ -4541,8 +4541,8 @@
           const goal = goalQuery();
           const uri =
             typeof goal === "string" && goal.length > 0
-              ? "resource://yacli/doctor?goal=" + encodeURIComponent(goal)
-              : "resource://yacli/doctor";
+              ? "resource://yamcli/doctor?goal=" + encodeURIComponent(goal)
+              : "resource://yamcli/doctor";
 
           try {
             const result = await sendRequest("resources/read", {
@@ -4584,7 +4584,7 @@
           await updateModelContext({
             kind: "markdown",
             content:
-              "Текущее onboarding-состояние yacli:\n\n" +
+              "Текущее onboarding-состояние yamcli:\n\n" +
               "- status: `" + String(detail.status || "unknown") + "`\n" +
               "- current account: `" + String(detail.current_account || "none") + "`\n" +
               (pendingChecks ? "\nОсталось сделать:\n" + pendingChecks : "\nВсе основные шаги закрыты."),
@@ -4619,7 +4619,7 @@
           await updateModelContext({
             kind: "markdown",
             content:
-              "Текущее health-check состояние yacli:\n\n" +
+              "Текущее health-check состояние yamcli:\n\n" +
               "- status: `" + String(detail.status || "unknown") + "`\n" +
               "- secret backend: `" + String((detail.config && detail.config.secretBackend) || "unknown") + "`\n" +
               "- current account: `" + String(detail.current_account || "none") + "`\n" +
@@ -4633,7 +4633,7 @@
           focusPanel("panel-home");
           setStatus("running", "Applying safe fixes");
           try {
-            const result = await callTool("yacli.doctor.apply_safe", {
+            const result = await callTool("yamcli.doctor.apply_safe", {
               account: elements.accountInput.value.trim() || undefined,
               goal: goalQuery() || undefined,
             });
@@ -4700,7 +4700,7 @@
           await updateModelContext({
             kind: "markdown",
             content:
-              "Следующие лучшие шаги для yacli:\n\n" +
+              "Следующие лучшие шаги для yamcli:\n\n" +
               "- status: `" + String(detail.status || "unknown") + "`\n" +
               "- summary: " + String(detail.summary || "") + "\n\n" +
               (actions || "- Нет обязательных шагов."),
@@ -4739,7 +4739,7 @@
           await updateModelContext({
             kind: "markdown",
             content:
-              "Proactive suggestions yacli:\n\n" +
+              "Proactive suggestions yamcli:\n\n" +
               "- status: `" + String(detail.status || "unknown") + "`\n" +
               "- summary: " + String(detail.summary || "") + "\n\n" +
               (items || "- Пока нет proactive suggestions из activity history и live product signals."),
@@ -4983,7 +4983,7 @@
           setStatus("running", "Reading resource");
           try {
             const result = await sendRequest("resources/read", { uri: uri });
-            if (uri === "resource://yacli/skills") {
+            if (uri === "resource://yamcli/skills") {
               state.skillsCatalogPayload = result;
             }
             renderResource(result);
@@ -5024,7 +5024,7 @@
           setStatus("running", "Opening activity");
           try {
             const result = await sendRequest("resources/read", {
-              uri: "resource://yacli/activity/" + id,
+              uri: "resource://yamcli/activity/" + id,
             });
             renderActivity(result);
             setStatus("ready", "Activity loaded");
@@ -5052,7 +5052,7 @@
           focusPanel("panel-activity");
           setStatus("running", "Undoing action");
           try {
-            await callTool("yacli.activity.undo", {
+            await callTool("yamcli.activity.undo", {
               id: activityIdValue,
             });
             await refreshActivityCatalog();
@@ -5117,7 +5117,7 @@
           await updateModelContext({
             kind: "markdown",
             content:
-              "Последнее действие yacli:\n\n" +
+              "Последнее действие yamcli:\n\n" +
               "- operation: `" + String(payload.operation || "unknown") + "`\n" +
               "- summary: " + String(payload.summary || "unknown") + "\n" +
               "- replay: `" + String(payload.replay_command) + "`",
@@ -5129,21 +5129,21 @@
           state.bootstrap.preferredResource = "account";
           state.bootstrap.preferredSkill = "";
           focusPanel("panel-resources");
-          readResource("resource://yacli/account/" + accountAlias());
+          readResource("resource://yamcli/account/" + accountAlias());
         }
 
         function readAuthResource() {
           state.bootstrap.preferredResource = "auth";
           state.bootstrap.preferredSkill = "";
           focusPanel("panel-auth");
-          readResource("resource://yacli/auth/" + accountAlias());
+          readResource("resource://yamcli/auth/" + accountAlias());
         }
 
         function readSkillsCatalog() {
           state.bootstrap.preferredResource = "skills";
           state.bootstrap.preferredSkill = "";
           focusPanel("panel-resources");
-          readResource("resource://yacli/skills");
+          readResource("resource://yamcli/skills");
         }
 
         async function routeGoal() {
@@ -5283,7 +5283,7 @@
           await updateModelContext({
             kind: "markdown",
             content:
-              "Remediation for routed yacli goal:\n\n" +
+              "Remediation for routed yamcli goal:\n\n" +
               "- goal: " + String(payload.query || goalQuery() || "") + "\n" +
               "- status: `" + String(payload.remediation.status || "unknown") + "`\n" +
               "- workflow: `" +
@@ -5387,7 +5387,7 @@
           setStatus("running", "Opening workflow");
           try {
             const result = await sendRequest("resources/read", {
-              uri: "resource://yacli/workflow/" + workflow,
+              uri: "resource://yamcli/workflow/" + workflow,
             });
             renderWorkflow(result);
             setStatus("ready", "Workflow loaded");
@@ -5512,7 +5512,7 @@
           state.bootstrap.preferredResource = "skill";
           state.bootstrap.preferredSkill = skill;
           focusPanel("panel-resources");
-          readResource("resource://yacli/skill/" + skill);
+          readResource("resource://yamcli/skill/" + skill);
         }
 
         async function listPrompts() {
@@ -5755,7 +5755,7 @@
             await renderSelectedPrompt();
           }
 
-          if (preferredTool && preferredTool !== "yacli.app.snapshot") {
+          if (preferredTool && preferredTool !== "yamcli.app.snapshot") {
             focusPanel("panel-tools");
             selectTool(preferredTool, true);
             return;
@@ -6054,7 +6054,7 @@
             elements.actionToggleDisplay.addEventListener("click", requestAlternateDisplayMode);
             renderBrowser();
             await refreshBrowserCatalogs();
-            await runTool("yacli.app.snapshot");
+            await runTool("yamcli.app.snapshot");
             await restoreBootstrapFocus();
           } catch (error) {
             const detail = error && error.message ? error.message : String(error);

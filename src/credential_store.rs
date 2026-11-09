@@ -3,12 +3,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 
-use crate::error::{Result, YacliError};
+use crate::error::{Result, YamcliError};
 use crate::paths::credentials_path;
 use crate::persist::write_config_file;
 
-const SECRET_BACKEND_ENV: &str = "YACLI_SECRET_BACKEND";
-const KEYRING_SERVICE_NAME: &str = "com.nextstat.yacli";
+const SECRET_BACKEND_ENV: &str = "YAMCLI_SECRET_BACKEND";
+const KEYRING_SERVICE_NAME: &str = "io.onega.yamcli";
+/// Keyring service used before the rename from `yacli` to `yamcli`; read once and migrated.
+const LEGACY_KEYRING_SERVICE_NAME: &str = "com.nextstat.yacli";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CredentialsFile {
@@ -221,7 +223,7 @@ fn configured_secret_backend() -> Result<SecretBackendKind> {
         Some("file") => Ok(SecretBackendKind::File),
         Some("keyring") => supported_keyring_backend(),
         None | Some("") => default_secret_backend(),
-        Some(other) => Err(YacliError::Config(format!(
+        Some(other) => Err(YamcliError::Config(format!(
             "unsupported secret backend `{other}`; expected `keyring` or `file`"
         ))),
     }
@@ -247,8 +249,8 @@ fn supported_keyring_backend() -> Result<SecretBackendKind> {
 
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
-        Err(YacliError::UnsupportedOperation(
-            "system keyring backend is not supported on this target; set YACLI_SECRET_BACKEND=file if you need legacy plaintext storage"
+        Err(YamcliError::UnsupportedOperation(
+            "system keyring backend is not supported on this target; set YAMCLI_SECRET_BACKEND=file if you need legacy plaintext storage"
                 .to_string(),
         ))
     }
@@ -288,36 +290,68 @@ fn migrate_legacy_credentials_file_to_keyring() -> Result<()> {
 
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 fn keyring_entry(account_name: &str, service: &str) -> Result<keyring::Entry> {
-    keyring::Entry::new(KEYRING_SERVICE_NAME, &format!("{account_name}:{service}"))
-        .map_err(|err| YacliError::Auth(format!("failed to create keyring entry: {err}")))
+    keyring_entry_for(KEYRING_SERVICE_NAME, account_name, service)
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+fn keyring_entry_for(
+    keyring_service: &str,
+    account_name: &str,
+    service: &str,
+) -> Result<keyring::Entry> {
+    keyring::Entry::new(keyring_service, &format!("{account_name}:{service}"))
+        .map_err(|err| YamcliError::Auth(format!("failed to create keyring entry: {err}")))
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 fn keyring_set(account_name: &str, service: &str, credential: &StoredCredential) -> Result<()> {
     let entry = keyring_entry(account_name, service)?;
     let payload = serde_json::to_string(credential)
-        .map_err(|err| YacliError::Serialization(err.to_string()))?;
-    entry
-        .set_password(&payload)
-        .map_err(|err| YacliError::Auth(format!("failed to store secret in system keyring: {err}")))
+        .map_err(|err| YamcliError::Serialization(err.to_string()))?;
+    entry.set_password(&payload).map_err(|err| {
+        YamcliError::Auth(format!("failed to store secret in system keyring: {err}"))
+    })
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 fn keyring_get(account_name: &str, service: &str) -> Result<Option<StoredCredential>> {
     let entry = keyring_entry(account_name, service)?;
     match entry.get_password() {
-        Ok(payload) => serde_json::from_str::<StoredCredential>(&payload)
-            .map(Some)
-            .map_err(|err| {
-                YacliError::Serialization(format!(
-                    "invalid secret payload in system keyring: {err}"
-                ))
-            }),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(err) => Err(YacliError::Auth(format!(
+        Ok(payload) => parse_keyring_payload(&payload).map(Some),
+        Err(keyring::Error::NoEntry) => migrate_legacy_keyring_entry(&entry, account_name, service),
+        Err(err) => Err(YamcliError::Auth(format!(
             "failed to read secret from system keyring: {err}"
         ))),
     }
+}
+
+/// Moves a secret stored under the pre-rename keyring service into the current one.
+/// Missing or unreadable legacy entries are treated as "no secret", never as an error.
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+fn migrate_legacy_keyring_entry(
+    current: &keyring::Entry,
+    account_name: &str,
+    service: &str,
+) -> Result<Option<StoredCredential>> {
+    let Ok(legacy) = keyring_entry_for(LEGACY_KEYRING_SERVICE_NAME, account_name, service) else {
+        return Ok(None);
+    };
+    let Ok(payload) = legacy.get_password() else {
+        return Ok(None);
+    };
+    let credential = parse_keyring_payload(&payload)?;
+    current.set_password(&payload).map_err(|err| {
+        YamcliError::Auth(format!("failed to store secret in system keyring: {err}"))
+    })?;
+    let _ = legacy.delete_credential();
+    Ok(Some(credential))
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+fn parse_keyring_payload(payload: &str) -> Result<StoredCredential> {
+    serde_json::from_str::<StoredCredential>(payload).map_err(|err| {
+        YamcliError::Serialization(format!("invalid secret payload in system keyring: {err}"))
+    })
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
@@ -325,7 +359,7 @@ fn keyring_delete(account_name: &str, service: &str) -> Result<()> {
     let entry = keyring_entry(account_name, service)?;
     match entry.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(err) => Err(YacliError::Auth(format!(
+        Err(err) => Err(YamcliError::Auth(format!(
             "failed to delete secret from system keyring: {err}"
         ))),
     }
@@ -333,21 +367,21 @@ fn keyring_delete(account_name: &str, service: &str) -> Result<()> {
 
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 fn keyring_set(_account_name: &str, _service: &str, _credential: &StoredCredential) -> Result<()> {
-    Err(YacliError::UnsupportedOperation(
+    Err(YamcliError::UnsupportedOperation(
         "system keyring backend is not supported on this target".to_string(),
     ))
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 fn keyring_get(_account_name: &str, _service: &str) -> Result<Option<StoredCredential>> {
-    Err(YacliError::UnsupportedOperation(
+    Err(YamcliError::UnsupportedOperation(
         "system keyring backend is not supported on this target".to_string(),
     ))
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 fn keyring_delete(_account_name: &str, _service: &str) -> Result<()> {
-    Err(YacliError::UnsupportedOperation(
+    Err(YamcliError::UnsupportedOperation(
         "system keyring backend is not supported on this target".to_string(),
     ))
 }
@@ -373,7 +407,7 @@ mod tests {
             .expect("credential store test lock");
         let temp = tempdir().expect("tempdir");
         unsafe {
-            env::set_var("YACLI_CONFIG_DIR", temp.path());
+            env::set_var("YAMCLI_CONFIG_DIR", temp.path());
             env::set_var(SECRET_BACKEND_ENV, "file");
         }
 
@@ -395,7 +429,7 @@ mod tests {
         assert_eq!(credential.secret, "secret-value");
 
         unsafe {
-            env::remove_var("YACLI_CONFIG_DIR");
+            env::remove_var("YAMCLI_CONFIG_DIR");
             env::remove_var(SECRET_BACKEND_ENV);
         }
     }
@@ -408,7 +442,7 @@ mod tests {
             .expect("credential store test lock");
         let temp = tempdir().expect("tempdir");
         unsafe {
-            env::set_var("YACLI_CONFIG_DIR", temp.path());
+            env::set_var("YAMCLI_CONFIG_DIR", temp.path());
             env::set_var(SECRET_BACKEND_ENV, "keyring");
         }
 
@@ -440,7 +474,7 @@ mod tests {
         assert!(matches!(store.backend, SecretBackendKind::Keyring));
 
         unsafe {
-            env::remove_var("YACLI_CONFIG_DIR");
+            env::remove_var("YAMCLI_CONFIG_DIR");
             env::remove_var(SECRET_BACKEND_ENV);
         }
     }
