@@ -27,5 +27,7 @@ mod persist;
 pub mod runtime_context;
 pub mod send_policy;
 pub mod suggestions;
+#[cfg(test)]
+mod test_support;
 pub mod update;
 pub mod workflows;
