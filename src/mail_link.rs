@@ -9,8 +9,8 @@ use crate::disk::{
 };
 use crate::error::{Result, YacliError};
 use crate::mail::{
-    MailSendRequest, MailSendReview, MailSessionAuth, SentMail, review_mail_submission,
-    send_mail_message,
+    MailDelivery, MailSendRequest, MailSendReview, MailSessionAuth, SentMail,
+    review_mail_submission, send_mail_message_via,
 };
 
 const PUBLIC_LINK_PLACEHOLDER: &str = "<публичная ссылка на файл>";
@@ -184,6 +184,7 @@ pub fn send_published_link_via_mail(
     smtp_port: u16,
     auth: MailSessionAuth,
     request: &MailSendPublishedLinkRequest,
+    delivery: MailDelivery<'_>,
 ) -> Result<SentMail> {
     let send_request = MailSendRequest {
         to: request.to.clone(),
@@ -204,7 +205,7 @@ pub fn send_published_link_via_mail(
         thread_headers: None,
     };
 
-    send_mail_message(smtp_host, smtp_port, auth, send_request)
+    send_mail_message_via(smtp_host, smtp_port, auth, send_request, delivery)
 }
 
 pub fn send_link_via_mail(
@@ -214,6 +215,7 @@ pub fn send_link_via_mail(
     smtp_port: u16,
     auth: MailSessionAuth,
     request: &MailSendLinkRequest,
+    delivery: MailDelivery<'_>,
 ) -> Result<MailSendLinkOutcome> {
     let (_, upload) = upload_private_resource(
         disk_base_url,
@@ -248,14 +250,15 @@ pub fn send_link_via_mail(
         public_url: public_url.to_string(),
     };
 
-    let sent = match send_published_link_via_mail(smtp_host, smtp_port, auth, &send_request) {
-        Ok(sent) => sent,
-        Err(err) => {
-            return Ok(MailSendLinkOutcome::Partial {
-                partial: partial_failure(&upload, &resource, &send_request, err),
-            });
-        }
-    };
+    let sent =
+        match send_published_link_via_mail(smtp_host, smtp_port, auth, &send_request, delivery) {
+            Ok(sent) => sent,
+            Err(err) => {
+                return Ok(MailSendLinkOutcome::Partial {
+                    partial: partial_failure(&upload, &resource, &send_request, err),
+                });
+            }
+        };
 
     Ok(MailSendLinkOutcome::Sent {
         result: MailSendLinkResult {

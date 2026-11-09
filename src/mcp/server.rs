@@ -31,6 +31,7 @@ use crate::error::{Result, YacliError};
 use crate::goal_router::goal_route_payload;
 use crate::home::home_payload;
 use crate::local_paths::{LocalAccess, resolve_mcp_local_path, resolve_mcp_local_paths};
+use crate::mail::MailDelivery;
 use crate::mail_invite_flow::{
     invite_create_event_command, partial_failure as invite_create_event_partial_failure,
 };
@@ -44,6 +45,9 @@ use crate::onboarding::onboarding_resource_payload;
 use crate::runtime_context::{
     auth_state, resolve_calendar_private_context, resolve_disk_private_context,
     resolve_mail_private_context,
+};
+use crate::send_policy::{
+    SEND_POLICY_ENV, SendPolicy, configured_send_policy, is_mail_sending_tool,
 };
 use crate::suggestions::suggestions_payload;
 use crate::update::check_for_update;
@@ -66,7 +70,7 @@ use crate::{
         MailAttachmentExportRequest, MailAttachmentSelector, MailInviteInspectRequest,
         export_mail_attachment, inspect_mail_invite, list_mail_folders, list_mail_messages,
         load_mail_attachments, read_mail_message, review_mail_submission, search_mail_messages,
-        send_mail_message,
+        send_mail_message_via,
     },
 };
 use chrono::{DateTime, Utc};
@@ -245,6 +249,11 @@ struct SessionState {
     initialized: bool,
     ui_enabled: bool,
     supports_resource_subscriptions: bool,
+    /// Client advertised `capabilities.elicitation`; needed for `confirm` policy.
+    supports_elicitation: bool,
+    /// Set by the transport layer after the human accepted an elicitation for
+    /// the very next mail-sending tool call; consumed by that call.
+    send_confirmed_once: bool,
     supports_roots_requests: bool,
     roots_list_changed_supported: bool,
     roots_dirty: bool,
@@ -260,6 +269,8 @@ impl SessionState {
             initialized: false,
             ui_enabled: false,
             supports_resource_subscriptions: true,
+            supports_elicitation: false,
+            send_confirmed_once: false,
             supports_roots_requests: false,
             roots_list_changed_supported: false,
             roots_dirty: false,
@@ -275,6 +286,8 @@ impl SessionState {
             initialized: false,
             ui_enabled: false,
             supports_resource_subscriptions: true,
+            supports_elicitation: false,
+            send_confirmed_once: false,
             supports_roots_requests: false,
             roots_list_changed_supported: false,
             roots_dirty: false,
@@ -1045,6 +1058,7 @@ fn handle_request(
             session.ui_enabled = client_supports_ui(&params);
             session.roots_list_changed_supported = client_supports_roots_list_changed(&params);
             session.supports_roots_requests = client_supports_roots(&params);
+            session.supports_elicitation = client_supports_elicitation(&params);
             session.roots_dirty = session.supports_roots_requests;
             session.cached_roots = None;
             session.initialized = true;
@@ -1086,7 +1100,7 @@ fn handle_request(
                         .to_string(),
                 ));
             }
-            call_tool(params, session.ui_enabled)
+            call_tool(params, session)
         }
         "resources/list" => Ok(json!({ "resources": resource_definitions(session.ui_enabled) })),
         "resources/templates/list" => {
@@ -1708,7 +1722,88 @@ fn tool(
     Value::Object(object)
 }
 
-fn call_tool(params: Value, ui_enabled: bool) -> Result<Value> {
+/// How the current mail-sending tool call will leave the account.
+#[derive(Clone, Debug)]
+struct MailDeliveryDecision {
+    configured: SendPolicy,
+    effective: SendPolicy,
+    reason: String,
+}
+
+impl MailDeliveryDecision {
+    fn is_draft(&self) -> bool {
+        self.effective == SendPolicy::Draft
+    }
+
+    fn mail_delivery<'a>(&self, imap_host: &'a str, imap_port: u16) -> MailDelivery<'a> {
+        if self.is_draft() {
+            MailDelivery::Draft {
+                imap_host,
+                imap_port,
+            }
+        } else {
+            MailDelivery::Smtp
+        }
+    }
+
+    fn status(&self) -> &'static str {
+        if self.is_draft() {
+            "draft_saved"
+        } else {
+            "completed"
+        }
+    }
+
+    fn to_json(&self) -> Value {
+        json!({
+            "configured_policy": self.configured.as_str(),
+            "effective_policy": self.effective.as_str(),
+            "env": SEND_POLICY_ENV,
+            "reason": self.reason,
+        })
+    }
+}
+
+fn decide_mail_delivery(session: &mut SessionState) -> Result<MailDeliveryDecision> {
+    let configured = configured_send_policy()?;
+    let confirmed = std::mem::take(&mut session.send_confirmed_once);
+    let (effective, reason) = match configured {
+        SendPolicy::Send => (
+            SendPolicy::Send,
+            "policy `send`: message is submitted over SMTP immediately".to_string(),
+        ),
+        SendPolicy::Draft => (
+            SendPolicy::Draft,
+            "policy `draft` (default): message is stored in the Drafts folder; a human must open it in the mail client and press send".to_string(),
+        ),
+        SendPolicy::Confirm if confirmed => (
+            SendPolicy::Send,
+            "policy `confirm`: the user approved this message via elicitation".to_string(),
+        ),
+        SendPolicy::Confirm if session.supports_elicitation => (
+            SendPolicy::Draft,
+            "policy `confirm`: no confirmation was obtained for this call, so the message was stored as a draft instead".to_string(),
+        ),
+        SendPolicy::Confirm => (
+            SendPolicy::Draft,
+            "policy `confirm`: the MCP client does not support elicitation, so the message was stored as a draft instead".to_string(),
+        ),
+    };
+    Ok(MailDeliveryDecision {
+        configured,
+        effective,
+        reason,
+    })
+}
+
+fn required_delivery(delivery: Option<&MailDeliveryDecision>) -> Result<&MailDeliveryDecision> {
+    delivery.ok_or_else(|| {
+        YacliError::Validation("internal error: mail delivery decision missing".to_string())
+    })
+}
+
+fn call_tool(params: Value, session: &mut SessionState) -> Result<Value> {
+    let ui_enabled = session.ui_enabled;
     let name = params
         .get("name")
         .and_then(Value::as_str)
@@ -1717,6 +1812,12 @@ fn call_tool(params: Value, ui_enabled: bool) -> Result<Value> {
         .get("arguments")
         .cloned()
         .unwrap_or(Value::Object(Map::new()));
+    let delivery = if is_mail_sending_tool(name) {
+        Some(decide_mail_delivery(session)?)
+    } else {
+        None
+    };
+    let delivery = delivery.as_ref();
 
     let structured = match name {
         "yacli.app.snapshot" => app_snapshot()?,
@@ -1775,6 +1876,7 @@ fn call_tool(params: Value, ui_enabled: bool) -> Result<Value> {
                 attachment_paths: string_list(&arguments, "attachments")?,
                 dry_run: optional_bool(&arguments, "dry_run").unwrap_or(false),
             },
+            required_delivery(delivery)?,
         )?,
         "yacli.mail.send_link" => mail_send_link(
             arguments.get("account").and_then(Value::as_str),
@@ -1790,6 +1892,7 @@ fn call_tool(params: Value, ui_enabled: bool) -> Result<Value> {
                 overwrite: optional_bool(&arguments, "overwrite").unwrap_or(false),
                 dry_run: optional_bool(&arguments, "dry_run").unwrap_or(false),
             },
+            required_delivery(delivery)?,
         )?,
         "yacli.mail.send_published_link" => mail_send_published_link(
             arguments.get("account").and_then(Value::as_str),
@@ -1803,6 +1906,7 @@ fn call_tool(params: Value, ui_enabled: bool) -> Result<Value> {
                 public_url: required_string(&arguments, "public_url")?.to_string(),
                 dry_run: optional_bool(&arguments, "dry_run").unwrap_or(false),
             },
+            required_delivery(delivery)?,
         )?,
         "yacli.mail.reply" => mail_reply(
             arguments.get("account").and_then(Value::as_str),
@@ -1811,6 +1915,7 @@ fn call_tool(params: Value, ui_enabled: bool) -> Result<Value> {
             string_list(&arguments, "cc")?,
             optional_string_owned(&arguments, "text"),
             optional_string_owned(&arguments, "html"),
+            required_delivery(delivery)?,
         )?,
         "yacli.mail.forward" => mail_forward(
             arguments.get("account").and_then(Value::as_str),
@@ -1827,6 +1932,7 @@ fn call_tool(params: Value, ui_enabled: bool) -> Result<Value> {
                 max_source_bytes: optional_u64(&arguments, "max_source_bytes")
                     .unwrap_or(15 * 1024 * 1024),
             },
+            required_delivery(delivery)?,
         )?,
         "yacli.mail.attachment.export" => mail_attachment_export(
             arguments.get("account").and_then(Value::as_str),
@@ -2551,7 +2657,11 @@ fn activity_undo(id: &str) -> Result<Value> {
     }))
 }
 
-fn mail_send(account: Option<&str>, request: MailSendToolRequest) -> Result<Value> {
+fn mail_send(
+    account: Option<&str>,
+    request: MailSendToolRequest,
+    delivery: &MailDeliveryDecision,
+) -> Result<Value> {
     let (resolved_account, auth, context) = resolve_mail_private_context(account)?;
     let attachment_paths = resolve_mcp_local_paths(&request.attachment_paths, LocalAccess::Read)?;
     let attachments = load_mail_attachments(&attachment_paths)?;
@@ -2572,6 +2682,7 @@ fn mail_send(account: Option<&str>, request: MailSendToolRequest) -> Result<Valu
             "account": resolved_account,
             "attachments": request.attachment_paths,
             "dry_run": true,
+            "delivery": delivery.to_json(),
             "review": review,
             "smtp": {
                 "host": context.smtp_host,
@@ -2579,7 +2690,13 @@ fn mail_send(account: Option<&str>, request: MailSendToolRequest) -> Result<Valu
             }
         }))
     } else {
-        let sent = send_mail_message(&context.smtp_host, context.smtp_port, auth, send_request)?;
+        let sent = send_mail_message_via(
+            &context.smtp_host,
+            context.smtp_port,
+            auth,
+            send_request,
+            delivery.mail_delivery(&context.imap_host, context.imap_port),
+        )?;
         let mut replay = format!(
             "yacli mail send {} {} {} --dry-run",
             shell_quote(sent.to.first().map(String::as_str).unwrap_or("")),
@@ -2588,10 +2705,19 @@ fn mail_send(account: Option<&str>, request: MailSendToolRequest) -> Result<Valu
         );
         record_activity_mcp(NewActivityEntry {
             source: "mcp".to_string(),
-            operation: "mail.send".to_string(),
+            operation: if delivery.is_draft() {
+                "mail.draft".to_string()
+            } else {
+                "mail.send".to_string()
+            },
             account: resolved_account.clone(),
             summary: format!(
-                "Отправлено письмо {}: {}",
+                "{} {}: {}",
+                if delivery.is_draft() {
+                    "Черновик сохранён для"
+                } else {
+                    "Отправлено письмо"
+                },
                 sent.to.first().cloned().unwrap_or_else(|| "-".to_string()),
                 sent.subject
             ),
@@ -2601,12 +2727,18 @@ fn mail_send(account: Option<&str>, request: MailSendToolRequest) -> Result<Valu
         Ok(json!({
             "account": resolved_account,
             "attachments": request.attachment_paths,
+            "status": delivery.status(),
+            "delivery": delivery.to_json(),
             "sent": sent,
         }))
     }
 }
 
-fn mail_send_link(account: Option<&str>, request: MailSendLinkToolRequest) -> Result<Value> {
+fn mail_send_link(
+    account: Option<&str>,
+    request: MailSendLinkToolRequest,
+    delivery: &MailDeliveryDecision,
+) -> Result<Value> {
     let (resolved_account, disk_base_url, access_token) = resolve_disk_private_context(account)?;
     let (_, auth, context) = resolve_mail_private_context(account)?;
     let send_link_request = MailSendLinkRequest {
@@ -2626,6 +2758,7 @@ fn mail_send_link(account: Option<&str>, request: MailSendLinkToolRequest) -> Re
         Ok(json!({
             "account": resolved_account,
             "dry_run": true,
+            "delivery": delivery.to_json(),
             "review": review,
             "disk": {
                 "base_url": disk_base_url,
@@ -2643,6 +2776,7 @@ fn mail_send_link(account: Option<&str>, request: MailSendLinkToolRequest) -> Re
             context.smtp_port,
             auth,
             &send_link_request,
+            delivery.mail_delivery(&context.imap_host, context.imap_port),
         )?;
         match outcome {
             MailSendLinkOutcome::Sent { result } => {
@@ -2659,19 +2793,35 @@ fn mail_send_link(account: Option<&str>, request: MailSendLinkToolRequest) -> Re
                 }
                 record_activity_mcp(NewActivityEntry {
                     source: "mcp".to_string(),
-                    operation: "mail.send_link".to_string(),
+                    operation: if delivery.is_draft() {
+                        "mail.send_link.draft".to_string()
+                    } else {
+                        "mail.send_link".to_string()
+                    },
                     account: resolved_account.clone(),
                     summary: format!(
-                        "Отправлена публичная ссылка на файл: {} -> {}",
+                        "{}: {} -> {}",
+                        if delivery.is_draft() {
+                            "Файл опубликован, письмо со ссылкой сохранено в черновики"
+                        } else {
+                            "Отправлена публичная ссылка на файл"
+                        },
                         result.resource.path,
                         result.resource.public_url.as_deref().unwrap_or("-")
                     ),
                     replay_command: replay,
-                    undo: None,
+                    // The public link exists even when the mail is only a draft;
+                    // keep it revocable from the activity surface.
+                    undo: if delivery.is_draft() {
+                        Some(disk_publish_undo(&result.resource))
+                    } else {
+                        None
+                    },
                 });
                 Ok(json!({
                     "account": resolved_account,
-                    "status": "completed",
+                    "status": delivery.status(),
+                    "delivery": delivery.to_json(),
                     "result": result,
                 }))
             }
@@ -2700,6 +2850,7 @@ fn mail_send_link(account: Option<&str>, request: MailSendLinkToolRequest) -> Re
 fn mail_send_published_link(
     account: Option<&str>,
     request: MailSendPublishedLinkToolRequest,
+    delivery: &MailDeliveryDecision,
 ) -> Result<Value> {
     let (resolved_account, auth, context) = resolve_mail_private_context(account)?;
     let send_request = MailSendPublishedLinkRequest {
@@ -2717,6 +2868,7 @@ fn mail_send_published_link(
         Ok(json!({
             "account": resolved_account,
             "dry_run": true,
+            "delivery": delivery.to_json(),
             "review": review,
             "smtp": {
                 "host": context.smtp_host,
@@ -2729,13 +2881,23 @@ fn mail_send_published_link(
             context.smtp_port,
             auth,
             &send_request,
+            delivery.mail_delivery(&context.imap_host, context.imap_port),
         )?;
         record_activity_mcp(NewActivityEntry {
             source: "mcp".to_string(),
-            operation: "mail.send_published_link".to_string(),
+            operation: if delivery.is_draft() {
+                "mail.send_published_link.draft".to_string()
+            } else {
+                "mail.send_published_link".to_string()
+            },
             account: resolved_account.clone(),
             summary: format!(
-                "Отправлена уже опубликованная ссылка: {}",
+                "{}: {}",
+                if delivery.is_draft() {
+                    "Письмо с опубликованной ссылкой сохранено в черновики"
+                } else {
+                    "Отправлена уже опубликованная ссылка"
+                },
                 send_request.public_url
             ),
             replay_command: send_published_link_command(&send_request, true),
@@ -2743,7 +2905,8 @@ fn mail_send_published_link(
         });
         Ok(json!({
             "account": resolved_account,
-            "status": "completed",
+            "status": delivery.status(),
+            "delivery": delivery.to_json(),
             "public_url": send_request.public_url,
             "sent": sent,
         }))
@@ -2757,6 +2920,7 @@ fn mail_reply(
     cc: Vec<String>,
     text: Option<String>,
     html: Option<String>,
+    delivery: &MailDeliveryDecision,
 ) -> Result<Value> {
     let (resolved_account, auth, context) = resolve_mail_private_context(account)?;
     let reply = crate::mail::reply_to_mail_message(
@@ -2772,15 +2936,22 @@ fn mail_reply(
             text,
             html,
         },
+        delivery.mail_delivery(&context.imap_host, context.imap_port),
     )?;
     Ok(json!({
         "account": resolved_account,
         "folder": folder,
+        "status": delivery.status(),
+        "delivery": delivery.to_json(),
         "reply": reply,
     }))
 }
 
-fn mail_forward(account: Option<&str>, request: MailForwardToolRequest) -> Result<Value> {
+fn mail_forward(
+    account: Option<&str>,
+    request: MailForwardToolRequest,
+    delivery: &MailDeliveryDecision,
+) -> Result<Value> {
     let (resolved_account, auth, context) = resolve_mail_private_context(account)?;
     let forward = crate::mail::forward_mail_message(
         &context.imap_host,
@@ -2798,10 +2969,13 @@ fn mail_forward(account: Option<&str>, request: MailForwardToolRequest) -> Resul
             html: request.html,
             max_source_bytes: request.max_source_bytes,
         },
+        delivery.mail_delivery(&context.imap_host, context.imap_port),
     )?;
     Ok(json!({
         "account": resolved_account,
         "folder": request.folder,
+        "status": delivery.status(),
+        "delivery": delivery.to_json(),
         "forward": forward,
     }))
 }
@@ -3968,6 +4142,13 @@ fn execute_stdio_request(
         return roots_list_tool_stdio(session, writer, rx, poller);
     }
 
+    if method == "tools/call"
+        && session.initialized
+        && let Some(cancelled) = confirm_mail_send_stdio(&params, session, writer, rx, poller)?
+    {
+        return Ok(cancelled);
+    }
+
     handle_request(method, params, session, Some(poller))
 }
 
@@ -3989,13 +4170,34 @@ fn roots_list_tool_stdio(
         return roots_tool_response(cached_roots, session.ui_enabled);
     }
 
+    let message = stdio_client_request(session, writer, rx, poller, "roots/list", None)?;
+    let roots = parse_roots_list_response(&message)?;
+    session.cached_roots = Some(roots.clone());
+    session.roots_dirty = false;
+    roots_tool_response(roots, session.ui_enabled)
+}
+
+/// Send a server-initiated JSON-RPC request to the stdio client and block until
+/// its response arrives. Nested client requests and notifications that show up
+/// while waiting are serviced in place so the session never deadlocks.
+fn stdio_client_request(
+    session: &mut SessionState,
+    writer: &mut dyn Write,
+    rx: &mpsc::Receiver<InputEvent>,
+    poller: &mut ResourceSubscriptionPoller,
+    method: &str,
+    params: Option<Value>,
+) -> Result<Value> {
     let request_id = session.next_outbound_request_id;
     session.next_outbound_request_id += 1;
-    let request = json!({
+    let mut request = json!({
         "jsonrpc": "2.0",
         "id": request_id,
-        "method": "roots/list"
+        "method": method,
     });
+    if let Some(params) = params {
+        request["params"] = params;
+    }
     write_message(writer, &request, session.stdio_message_format)?;
 
     loop {
@@ -4007,22 +4209,19 @@ fn roots_list_tool_stdio(
                 {
                     if let Some(error) = message.get("error") {
                         let code = error.get("code").and_then(Value::as_i64).unwrap_or(-32000);
-                        let message = error
+                        let text = error
                             .get("message")
                             .and_then(Value::as_str)
-                            .unwrap_or("roots/list failed");
+                            .map(str::to_string)
+                            .unwrap_or_else(|| format!("{method} failed"));
                         let err = if code == -32601 {
-                            YacliError::UnsupportedOperation(message.to_string())
+                            YacliError::UnsupportedOperation(text)
                         } else {
-                            YacliError::Validation(message.to_string())
+                            YacliError::Validation(text)
                         };
                         return Err(err);
                     }
-
-                    let roots = parse_roots_list_response(&message)?;
-                    session.cached_roots = Some(roots.clone());
-                    session.roots_dirty = false;
-                    return roots_tool_response(roots, session.ui_enabled);
+                    return Ok(message);
                 }
 
                 if message.get("method").is_none() {
@@ -4073,16 +4272,16 @@ fn roots_list_tool_stdio(
                 write_message(writer, &response, session.stdio_message_format)?;
             }
             Ok(InputEvent::Eof) => {
-                return Err(YacliError::Io(
-                    "stdio stream closed while waiting for roots/list response".to_string(),
-                ));
+                return Err(YacliError::Io(format!(
+                    "stdio stream closed while waiting for {method} response"
+                )));
             }
             Ok(InputEvent::Error(err)) => return Err(err),
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => {
-                return Err(YacliError::Io(
-                    "stdio reader disconnected while waiting for roots/list response".to_string(),
-                ));
+                return Err(YacliError::Io(format!(
+                    "stdio reader disconnected while waiting for {method} response"
+                )));
             }
         }
 
@@ -4090,6 +4289,140 @@ fn roots_list_tool_stdio(
             write_message(writer, &notification, session.stdio_message_format)?;
         }
     }
+}
+
+/// `confirm` policy on stdio: ask the human through `elicitation/create` before
+/// a mail-sending tool runs. Returns `Some(result)` when the call must not
+/// proceed (declined / cancelled) and `None` when it may.
+fn confirm_mail_send_stdio(
+    params: &Value,
+    session: &mut SessionState,
+    writer: &mut dyn Write,
+    rx: &mpsc::Receiver<InputEvent>,
+    poller: &mut ResourceSubscriptionPoller,
+) -> Result<Option<Value>> {
+    let Some(tool_name) = requested_tool_name(params) else {
+        return Ok(None);
+    };
+    let arguments = params.get("arguments").cloned().unwrap_or(Value::Null);
+    if !is_mail_sending_tool(tool_name)
+        || optional_bool(&arguments, "dry_run").unwrap_or(false)
+        || configured_send_policy()? != SendPolicy::Confirm
+        || !session.supports_elicitation
+    {
+        return Ok(None);
+    }
+
+    let summary = describe_mail_send_for_confirmation(tool_name, &arguments);
+    let elicitation = json!({
+        "message": format!(
+            "yacli: ИИ-агент хочет отправить письмо через {tool_name}.\n\n{summary}\n\nПодтвердить отправку? Если вы этого не просили — откажитесь."
+        ),
+        "requestedSchema": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "type": "boolean",
+                    "title": "Отправить письмо",
+                    "description": "true — отправить сейчас по SMTP; false — ничего не отправлять"
+                }
+            },
+            "required": ["confirm"]
+        }
+    });
+    let response = stdio_client_request(
+        session,
+        writer,
+        rx,
+        poller,
+        "elicitation/create",
+        Some(elicitation),
+    )?;
+    let result = response.get("result").cloned().unwrap_or(Value::Null);
+    let action = result
+        .get("action")
+        .and_then(Value::as_str)
+        .unwrap_or("cancel");
+    let confirmed = action == "accept"
+        && result
+            .get("content")
+            .and_then(|content| content.get("confirm"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+
+    if confirmed {
+        session.send_confirmed_once = true;
+        return Ok(None);
+    }
+
+    let structured = json!({
+        "status": "cancelled",
+        "tool": tool_name,
+        "delivery": {
+            "configured_policy": SendPolicy::Confirm.as_str(),
+            "effective_policy": "none",
+            "env": SEND_POLICY_ENV,
+            "reason": format!("the user did not confirm the send (elicitation action: {action}); nothing was sent and no draft was stored"),
+        },
+    });
+    Ok(Some(json!({
+        "structuredContent": structured,
+        "content": [{
+            "type": "text",
+            "text": format!("Отправка отменена пользователем ({action}). Письмо не отправлено и не сохранено.")
+        }],
+    })))
+}
+
+fn describe_mail_send_for_confirmation(tool_name: &str, arguments: &Value) -> String {
+    let mut lines = Vec::new();
+    if let Some(account) = arguments.get("account").and_then(Value::as_str) {
+        lines.push(format!("Аккаунт: {account}"));
+    }
+    if let Some(to) = arguments.get("to").and_then(Value::as_str) {
+        lines.push(format!("Кому: {to}"));
+    }
+    for (key, label) in [("cc", "Копия"), ("bcc", "Скрытая копия")] {
+        if let Some(list) = arguments.get(key).and_then(Value::as_array)
+            && !list.is_empty()
+        {
+            let joined = list
+                .iter()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(", ");
+            lines.push(format!("{label}: {joined}"));
+        }
+    }
+    if let Some(subject) = arguments.get("subject").and_then(Value::as_str) {
+        lines.push(format!("Тема: {subject}"));
+    }
+    if let Some(uid) = arguments.get("uid").and_then(Value::as_u64) {
+        lines.push(format!("Исходное письмо uid: {uid}"));
+    }
+    if let Some(attachments) = arguments.get("attachments").and_then(Value::as_array)
+        && !attachments.is_empty()
+    {
+        let joined = attachments
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        lines.push(format!("Вложения: {joined}"));
+    }
+    for key in ["source_path", "disk_path", "public_url"] {
+        if let Some(value) = arguments.get(key).and_then(Value::as_str) {
+            lines.push(format!("{key}: {value}"));
+        }
+    }
+    if let Some(text) = arguments.get("text").and_then(Value::as_str) {
+        let preview: String = text.chars().take(200).collect();
+        lines.push(format!("Текст: {preview}"));
+    }
+    if lines.is_empty() {
+        lines.push(format!("Инструмент: {tool_name}"));
+    }
+    lines.join("\n")
 }
 
 fn roots_tool_response(roots: Vec<Value>, ui_enabled: bool) -> Result<Value> {
@@ -4178,6 +4511,13 @@ fn client_supports_ui(params: &Value) -> bool {
         .into_iter()
         .chain(capability_mime_types(params, "experimental"))
         .any(|mime_type| mime_type == APP_RESOURCE_MIME_TYPE)
+}
+
+fn client_supports_elicitation(params: &Value) -> bool {
+    params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("elicitation"))
+        .is_some()
 }
 
 fn client_supports_roots(params: &Value) -> bool {

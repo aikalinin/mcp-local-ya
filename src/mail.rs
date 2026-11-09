@@ -130,6 +130,33 @@ pub struct SentMail {
     pub subject: String,
     pub message_id: String,
     pub body_kind: String,
+    /// `"smtp"` when the message was submitted for delivery, `"draft"` when it
+    /// was stored in the Drafts folder and still needs a human to press send.
+    #[serde(default = "default_delivery")]
+    pub delivery: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub draft: Option<MailDraftLocation>,
+}
+
+fn default_delivery() -> String {
+    "smtp".to_string()
+}
+
+/// Where a draft landed in the mailbox.
+#[derive(Clone, Debug, Serialize, Eq, PartialEq)]
+pub struct MailDraftLocation {
+    pub folder: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uid: Option<u64>,
+}
+
+/// How an outgoing message leaves yacli.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MailDelivery<'a> {
+    /// Submit over SMTP right away.
+    Smtp,
+    /// Store in the Drafts folder of the given IMAP server; nothing is sent.
+    Draft { imap_host: &'a str, imap_port: u16 },
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]
@@ -162,6 +189,10 @@ pub struct MailSendRemediation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suggested_disk_path: Option<String>,
 }
+
+/// Mailbox names tried when the server does not advertise a `\Drafts` folder.
+pub const DRAFTS_MAILBOX_CANDIDATES: &[&str] =
+    &["Drafts", "Черновики", "INBOX.Drafts", "INBOX/Drafts"];
 
 #[derive(Clone, Debug)]
 pub struct MailThreadHeaders {
@@ -435,6 +466,34 @@ pub fn send_mail_message(
     auth: MailSessionAuth,
     request: MailSendRequest,
 ) -> Result<SentMail> {
+    send_mail_message_via(smtp_host, smtp_port, auth, request, MailDelivery::Smtp)
+}
+
+/// Build the outgoing message and either submit it over SMTP or store it in
+/// the Drafts folder, depending on `delivery`. The returned `SentMail`
+/// reports which of the two happened in `delivery` / `draft`.
+pub fn send_mail_message_via(
+    smtp_host: &str,
+    smtp_port: u16,
+    auth: MailSessionAuth,
+    request: MailSendRequest,
+    delivery: MailDelivery<'_>,
+) -> Result<SentMail> {
+    match delivery {
+        MailDelivery::Smtp => submit_over_smtp(smtp_host, smtp_port, auth, request),
+        MailDelivery::Draft {
+            imap_host,
+            imap_port,
+        } => save_mail_draft(imap_host, imap_port, auth, request),
+    }
+}
+
+fn submit_over_smtp(
+    smtp_host: &str,
+    smtp_port: u16,
+    auth: MailSessionAuth,
+    request: MailSendRequest,
+) -> Result<SentMail> {
     let prepared = prepare_mail_submission(auth, request)?;
     ensure_smtp_safe_submission(&prepared)?;
     let mut session = SmtpSession::connect(smtp_host, smtp_port)?;
@@ -457,6 +516,33 @@ pub fn send_mail_message(
     )?;
     let _ = session.quit();
     Ok(prepared.sent)
+}
+
+/// Build the outgoing message exactly as `send_mail_message` would, but store
+/// it in the Drafts folder via IMAP APPEND instead of sending it. Nothing
+/// leaves the account until the user opens the draft and presses "send".
+pub fn save_mail_draft(
+    imap_host: &str,
+    imap_port: u16,
+    auth: MailSessionAuth,
+    request: MailSendRequest,
+) -> Result<SentMail> {
+    let prepared = prepare_mail_submission(auth.clone(), request)?;
+    let mut session = open_authenticated_session(imap_host, imap_port, auth)?;
+    let folder = session.resolve_drafts_mailbox()?;
+    let uid = session.append_message(
+        &folder.raw_name,
+        &["\\Draft", "\\Seen"],
+        prepared.message.as_bytes(),
+    )?;
+    let _ = session.logout();
+    let mut sent = prepared.sent;
+    sent.delivery = "draft".to_string();
+    sent.draft = Some(MailDraftLocation {
+        folder: folder.name,
+        uid,
+    });
+    Ok(sent)
 }
 
 pub fn review_mail_submission(
@@ -538,6 +624,7 @@ pub fn inspect_mail_invite(
     inspect_invite_from_message(&message, &request.selector)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn reply_to_mail_message(
     imap_host: &str,
     imap_port: u16,
@@ -546,6 +633,7 @@ pub fn reply_to_mail_message(
     auth: MailSessionAuth,
     mailbox_name: &str,
     request: MailReplyRequest,
+    delivery: MailDelivery<'_>,
 ) -> Result<RepliedMail> {
     if request.uid == 0 {
         return Err(YacliError::Validation(
@@ -562,7 +650,7 @@ pub fn reply_to_mail_message(
         mailbox_name,
         request.uid,
     )?;
-    let sent = send_mail_message(
+    let sent = send_mail_message_via(
         smtp_host,
         smtp_port,
         auth,
@@ -579,6 +667,7 @@ pub fn reply_to_mail_message(
                 references: target.references.clone(),
             }),
         },
+        delivery,
     )?;
 
     Ok(RepliedMail {
@@ -590,6 +679,7 @@ pub fn reply_to_mail_message(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn forward_mail_message(
     imap_host: &str,
     imap_port: u16,
@@ -598,6 +688,7 @@ pub fn forward_mail_message(
     auth: MailSessionAuth,
     mailbox_name: &str,
     request: MailForwardRequest,
+    delivery: MailDelivery<'_>,
 ) -> Result<ForwardedMail> {
     if request.uid == 0 {
         return Err(YacliError::Validation(
@@ -619,7 +710,7 @@ pub fn forward_mail_message(
         normalized.intro_text.as_deref(),
         normalized.intro_html.as_deref(),
     );
-    let sent = send_mail_message(
+    let sent = send_mail_message_via(
         smtp_host,
         smtp_port,
         auth,
@@ -637,6 +728,7 @@ pub fn forward_mail_message(
                 .collect(),
             thread_headers: None,
         },
+        delivery,
     )?;
 
     Ok(ForwardedMail {
@@ -724,8 +816,8 @@ struct SmtpResponse {
     lines: Vec<String>,
 }
 
-struct ImapSession {
-    reader: BufReader<native_tls::TlsStream<TcpStream>>,
+struct ImapSession<S: Read + Write = native_tls::TlsStream<TcpStream>> {
+    reader: BufReader<S>,
     next_tag: u32,
 }
 
@@ -788,6 +880,16 @@ impl ImapSession {
         }
 
         Ok(session)
+    }
+}
+
+impl<S: Read + Write> ImapSession<S> {
+    #[cfg(test)]
+    fn from_stream(stream: S) -> Self {
+        Self {
+            reader: BufReader::new(stream),
+            next_tag: 1,
+        }
     }
 
     fn authenticate_xoauth2(&mut self, account: &str, access_token: &str) -> Result<()> {
@@ -990,6 +1092,45 @@ impl ImapSession {
                 return Ok(literal);
             }
         }
+    }
+
+    fn resolve_drafts_mailbox(&mut self) -> Result<MailFolder> {
+        let folders = self.list_folders()?;
+        select_drafts_mailbox(&folders)
+    }
+
+    /// `APPEND mailbox (flags) {len}` with a synchronizing literal. Returns the
+    /// UID from an `[APPENDUID ...]` response code when the server provides one.
+    fn append_message(
+        &mut self,
+        raw_mailbox: &str,
+        flags: &[&str],
+        message: &[u8],
+    ) -> Result<Option<u64>> {
+        let tag = self.next_tag();
+        let quoted_mailbox = quote_imap_string(raw_mailbox);
+        self.write_line(&format!(
+            "{tag} APPEND {quoted_mailbox} ({}) {{{}}}",
+            flags.join(" "),
+            message.len()
+        ))?;
+
+        let continuation = self.read_line()?;
+        if !continuation.starts_with('+') {
+            if continuation.starts_with(&tag) {
+                parse_tagged_status(&tag, &continuation, "IMAP APPEND", TaggedErrorKind::Api)?;
+            }
+            return Err(YacliError::Api(format!(
+                "IMAP APPEND literal was not accepted: {continuation}"
+            )));
+        }
+
+        self.write_bytes(message)?;
+        self.write_line("")?;
+
+        let (_, tagged) = self.read_until_tag(&tag)?;
+        parse_tagged_status(&tag, &tagged, "IMAP APPEND", TaggedErrorKind::Api)?;
+        Ok(parse_appenduid(&tagged))
     }
 
     fn logout(&mut self) -> Result<()> {
@@ -1434,6 +1575,8 @@ fn prepare_mail_submission(
             subject,
             message_id,
             body_kind,
+            delivery: default_delivery(),
+            draft: None,
         },
     })
 }
@@ -2003,6 +2146,37 @@ fn extract_trailing_literal_len(line: &str) -> Result<Option<usize>> {
         ))
     })?;
     Ok(Some(value))
+}
+
+fn select_drafts_mailbox(folders: &[MailFolder]) -> Result<MailFolder> {
+    if let Some(folder) = folders.iter().find(|folder| {
+        folder
+            .attributes
+            .iter()
+            .any(|attribute| attribute.eq_ignore_ascii_case("\\Drafts"))
+    }) {
+        return Ok(folder.clone());
+    }
+    for candidate in DRAFTS_MAILBOX_CANDIDATES {
+        if let Some(folder) = folders
+            .iter()
+            .find(|folder| folder.name.eq_ignore_ascii_case(candidate))
+        {
+            return Ok(folder.clone());
+        }
+    }
+    Err(YacliError::Api(
+        "could not find a Drafts mailbox: the IMAP server advertises no \\Drafts folder and none of the known names exist".to_string(),
+    ))
+}
+
+fn parse_appenduid(tagged: &str) -> Option<u64> {
+    let start = tagged.find("[APPENDUID ")? + "[APPENDUID ".len();
+    let rest = &tagged[start..];
+    let end = rest.find(']')?;
+    let mut parts = rest[..end].split_whitespace();
+    let _uid_validity = parts.next()?;
+    parts.next()?.parse::<u64>().ok()
 }
 
 fn parse_list_line(line: &str) -> Result<MailFolder> {
@@ -2842,16 +3016,17 @@ struct ExportedBytes {
 #[cfg(test)]
 mod tests {
     use super::{
-        FetchMetadata, MailAttachmentExportRequest, MailAttachmentPart, MailAttachmentPayload,
-        MailAttachmentSelector, MailAttachmentSummary, MailMessage, MailSendRequest,
-        MailSessionAuth, MailThreadHeaders, OutgoingMessage, SMTP_SAFE_MESSAGE_BYTES, SmtpSession,
-        build_forward_body, build_message_summary, build_outgoing_message, build_read_message,
-        build_reply_target, build_xoauth2_payload, decode_modified_utf7, encode_modified_utf7,
-        export_attachment_from_message, extract_message_content, inspect_invite_from_message,
-        load_mail_attachments, normalize_forward_subject, normalize_reply_subject,
-        normalize_search_query, parse_fetch_metadata, parse_imap_token, parse_list_line,
+        FetchMetadata, ImapSession, MailAttachmentExportRequest, MailAttachmentPart,
+        MailAttachmentPayload, MailAttachmentSelector, MailAttachmentSummary, MailFolder,
+        MailMessage, MailSendRequest, MailSessionAuth, MailThreadHeaders, OutgoingMessage,
+        SMTP_SAFE_MESSAGE_BYTES, SmtpSession, build_forward_body, build_message_summary,
+        build_outgoing_message, build_read_message, build_reply_target, build_xoauth2_payload,
+        decode_modified_utf7, encode_modified_utf7, export_attachment_from_message,
+        extract_message_content, inspect_invite_from_message, load_mail_attachments,
+        normalize_forward_subject, normalize_reply_subject, normalize_search_query,
+        parse_appenduid, parse_fetch_metadata, parse_imap_token, parse_list_line,
         parse_search_uids, prepare_mail_submission, quote_imap_string, review_mail_submission,
-        send_mail_message, validate_mail_attachment_export_request,
+        select_drafts_mailbox, send_mail_message, validate_mail_attachment_export_request,
         validate_mail_attachment_read_request,
     };
     use base64::Engine;
@@ -3804,5 +3979,100 @@ mod tests {
         assert_eq!(inspected.invites.len(), 1);
         assert_eq!(inspected.invites[0].uid.as_deref(), Some("evt-1"));
         assert_eq!(inspected.invites[0].summary.as_deref(), Some("Sync"));
+    }
+    #[test]
+    fn select_drafts_mailbox_prefers_special_use_attribute() {
+        let folders = vec![
+            MailFolder {
+                name: "INBOX".to_string(),
+                raw_name: "INBOX".to_string(),
+                delimiter: Some("|".to_string()),
+                attributes: vec!["\\HasNoChildren".to_string()],
+            },
+            MailFolder {
+                name: "Черновики".to_string(),
+                raw_name: "&BCcENQRABD0EPgQyBDgEOgQ4-".to_string(),
+                delimiter: Some("|".to_string()),
+                attributes: vec!["\\HasNoChildren".to_string(), "\\Drafts".to_string()],
+            },
+        ];
+        let folder = select_drafts_mailbox(&folders).expect("drafts folder");
+        assert_eq!(folder.raw_name, "&BCcENQRABD0EPgQyBDgEOgQ4-");
+    }
+
+    #[test]
+    fn select_drafts_mailbox_falls_back_to_known_names_and_fails_otherwise() {
+        let folders = vec![MailFolder {
+            name: "Drafts".to_string(),
+            raw_name: "Drafts".to_string(),
+            delimiter: None,
+            attributes: Vec::new(),
+        }];
+        assert_eq!(
+            select_drafts_mailbox(&folders).expect("drafts").name,
+            "Drafts"
+        );
+
+        let folders = vec![MailFolder {
+            name: "INBOX".to_string(),
+            raw_name: "INBOX".to_string(),
+            delimiter: None,
+            attributes: Vec::new(),
+        }];
+        assert!(select_drafts_mailbox(&folders).is_err());
+    }
+
+    #[test]
+    fn parse_appenduid_extracts_uid_from_tagged_response() {
+        assert_eq!(
+            parse_appenduid("A0003 OK [APPENDUID 1700000000 4321] APPEND completed"),
+            Some(4321)
+        );
+        assert_eq!(parse_appenduid("A0003 OK APPEND completed"), None);
+        assert_eq!(parse_appenduid("A0003 OK [APPENDUID 17 x] done"), None);
+    }
+    #[test]
+    fn imap_append_message_stores_draft_and_reads_appenduid() {
+        let script = "* LIST (\\HasNoChildren) \"|\" \"INBOX\"\r\n\
+                      * LIST (\\HasNoChildren \\Drafts) \"|\" \"Drafts\"\r\n\
+                      A0001 OK LIST completed\r\n\
+                      + go ahead\r\n\
+                      A0002 OK [APPENDUID 1234567 77] APPEND completed\r\n";
+        let stream = FakeStream::new(script);
+        let mut session = ImapSession::from_stream(stream.clone());
+
+        let folder = session.resolve_drafts_mailbox().expect("drafts folder");
+        assert_eq!(folder.raw_name, "Drafts");
+
+        let message = b"Subject: Draft\r\n\r\nbody\r\n";
+        let uid = session
+            .append_message(&folder.raw_name, &["\\Draft", "\\Seen"], message)
+            .expect("append");
+        assert_eq!(uid, Some(77));
+
+        let written = stream.written();
+        assert!(written.contains("A0001 LIST \"\" \"*\"\r\n"), "{written}");
+        assert!(
+            written.contains(&format!(
+                "A0002 APPEND \"Drafts\" (\\Draft \\Seen) {{{}}}\r\n",
+                message.len()
+            )),
+            "{written}"
+        );
+        assert!(
+            written.ends_with("Subject: Draft\r\n\r\nbody\r\n\r\n"),
+            "{written}"
+        );
+    }
+
+    #[test]
+    fn imap_append_message_reports_rejected_literal() {
+        let script = "A0001 NO [TRYCREATE] mailbox does not exist\r\n";
+        let stream = FakeStream::new(script);
+        let mut session = ImapSession::from_stream(stream);
+        let err = session
+            .append_message("Drafts", &["\\Draft"], b"x")
+            .expect_err("append must fail");
+        assert!(err.to_string().contains("APPEND"), "{err}");
     }
 }

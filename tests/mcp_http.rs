@@ -1311,6 +1311,7 @@ client_id = "client-123"
             "YACLI_MCP_ALLOWED_PATHS",
             files_dir.to_str().expect("files dir"),
         ),
+        ("YACLI_MCP_SEND_POLICY", "send"),
     ]);
     let client = client();
 

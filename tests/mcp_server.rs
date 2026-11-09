@@ -1247,6 +1247,7 @@ client_id = "client-123"
 
     let output = yacli()
         .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_SEND_POLICY", "send")
         .env("YACLI_MCP_ALLOWED_PATHS", &files_dir)
         .args(["mcp"])
         .write_stdin(input)
@@ -4758,4 +4759,302 @@ rest_base_url = "https://cloud-api.yandex.net"
 
     let _ = child.kill();
     let _ = child.wait();
+}
+
+fn initialize_request_with_elicitation() -> String {
+    mcp_request(
+        1,
+        "initialize",
+        json!({
+            "protocolVersion": "2025-11-25",
+            "capabilities": { "elicitation": {} },
+            "clientInfo": { "name": "test", "version": "0.1.0" }
+        }),
+    )
+}
+
+/// Mail account whose IMAP and SMTP endpoints both point at closed local ports
+/// so the test can tell from the error which protocol a tool reached for.
+fn write_dead_mail_account(config_dir: &std::path::Path, imap_port: u16, smtp_port: u16) {
+    write_accounts_file(
+        config_dir,
+        &format!(
+            r#"
+version = 1
+
+[accounts.mock]
+email = "me@yandex.ru"
+default = true
+
+[accounts.mock.mail]
+enabled = true
+auth_mode = "oauth_xoauth2"
+imap_host = "127.0.0.1"
+imap_port = {imap_port}
+smtp_host = "127.0.0.1"
+smtp_port = {smtp_port}
+credential_ref = "store:mail"
+
+[accounts.mock.calendar]
+enabled = false
+auth_mode = "app_password"
+caldav_base_url = "https://caldav.yandex.ru"
+
+[accounts.mock.disk]
+enabled = false
+auth_mode = "oauth"
+rest_base_url = "https://cloud-api.yandex.net"
+"#
+        ),
+    );
+    write_credentials_file(
+        config_dir,
+        r#"
+version = 1
+
+[accounts.mock.services.mail]
+kind = "oauth_pkce"
+access_token = "mail-token"
+token_type = "bearer"
+expires_at_epoch_secs = 4102444800
+scope = ["mail:imap_full", "mail:smtp"]
+client_id = "client-123"
+"#,
+    );
+}
+
+fn closed_local_port() -> u16 {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    drop(listener);
+    port
+}
+
+fn mail_send_call(id: u64, dry_run: bool) -> String {
+    mcp_request(
+        id,
+        "tools/call",
+        json!({
+            "name": "yacli.mail.send",
+            "arguments": {
+                "account": "mock",
+                "to": "person@example.com",
+                "subject": "Hello",
+                "text": "body",
+                "dry_run": dry_run
+            }
+        }),
+    )
+}
+
+#[test]
+fn mcp_stdio_mail_send_defaults_to_draft_policy_and_reports_it_in_dry_run() {
+    let temp = tempdir().expect("tempdir");
+    let imap_port = closed_local_port();
+    let smtp_port = closed_local_port();
+    write_dead_mail_account(temp.path(), imap_port, smtp_port);
+
+    let input = [
+        initialize_request(false),
+        mail_send_call(2, true),
+        mail_send_call(3, false),
+    ]
+    .concat();
+
+    let output = yacli()
+        .env("YACLI_CONFIG_DIR", temp.path())
+        .args(["mcp"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let responses = parse_responses(&output);
+    let dry_run = &responses[1]["result"]["structuredContent"];
+    assert_eq!(dry_run["dry_run"], true);
+    assert_eq!(dry_run["delivery"]["configured_policy"], "draft");
+    assert_eq!(dry_run["delivery"]["effective_policy"], "draft");
+    assert_eq!(dry_run["delivery"]["env"], "YACLI_MCP_SEND_POLICY");
+
+    // The real call goes to IMAP (Drafts folder), never to SMTP.
+    let error = &responses[2]["error"];
+    let message = error["message"].as_str().expect("error text");
+    assert!(message.contains("IMAP"), "{message}");
+    assert!(!message.contains("SMTP"), "{message}");
+}
+
+#[test]
+fn mcp_stdio_mail_send_policy_send_uses_smtp() {
+    let temp = tempdir().expect("tempdir");
+    let imap_port = closed_local_port();
+    let smtp_port = closed_local_port();
+    write_dead_mail_account(temp.path(), imap_port, smtp_port);
+
+    let input = [initialize_request(false), mail_send_call(2, false)].concat();
+
+    let output = yacli()
+        .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_SEND_POLICY", "send")
+        .args(["mcp"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let responses = parse_responses(&output);
+    let message = responses[1]["error"]["message"]
+        .as_str()
+        .expect("error text");
+    assert!(message.contains("SMTP"), "{message}");
+}
+
+#[test]
+fn mcp_stdio_mail_send_rejects_unknown_policy() {
+    let temp = tempdir().expect("tempdir");
+    write_dead_mail_account(temp.path(), closed_local_port(), closed_local_port());
+
+    let input = [initialize_request(false), mail_send_call(2, true)].concat();
+
+    let output = yacli()
+        .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_SEND_POLICY", "yolo")
+        .args(["mcp"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let responses = parse_responses(&output);
+    let message = responses[1]["error"]["message"]
+        .as_str()
+        .expect("error text");
+    assert!(message.contains("YACLI_MCP_SEND_POLICY"), "{message}");
+}
+
+#[test]
+fn mcp_stdio_confirm_policy_falls_back_to_draft_without_elicitation_capability() {
+    let temp = tempdir().expect("tempdir");
+    write_dead_mail_account(temp.path(), closed_local_port(), closed_local_port());
+
+    let input = [initialize_request(false), mail_send_call(2, true)].concat();
+
+    let output = yacli()
+        .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_SEND_POLICY", "confirm")
+        .args(["mcp"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let responses = parse_responses(&output);
+    let delivery = &responses[1]["result"]["structuredContent"]["delivery"];
+    assert_eq!(delivery["configured_policy"], "confirm");
+    assert_eq!(delivery["effective_policy"], "draft");
+    assert!(
+        delivery["reason"]
+            .as_str()
+            .expect("reason")
+            .contains("elicitation")
+    );
+}
+
+#[test]
+fn mcp_stdio_confirm_policy_asks_via_elicitation_and_honours_decline() {
+    let temp = tempdir().expect("tempdir");
+    write_dead_mail_account(temp.path(), closed_local_port(), closed_local_port());
+
+    // Server outbound request ids start at 1; the first elicitation gets id 1.
+    let input = [
+        initialize_request_with_elicitation(),
+        mail_send_call(2, false),
+        mcp_response(1, json!({ "action": "decline" })),
+    ]
+    .concat();
+
+    let output = yacli()
+        .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_SEND_POLICY", "confirm")
+        .args(["mcp"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let messages = parse_responses(&output);
+    // [0] initialize result, [1] server -> client elicitation/create, [2] tool result
+    assert_eq!(messages[1]["method"], "elicitation/create");
+    assert_eq!(messages[1]["id"], 1);
+    let text = messages[1]["params"]["message"]
+        .as_str()
+        .expect("elicitation message");
+    assert!(text.contains("person@example.com"), "{text}");
+    assert!(text.contains("Hello"), "{text}");
+    assert_eq!(
+        messages[1]["params"]["requestedSchema"]["required"][0],
+        "confirm"
+    );
+
+    let structured = &messages[2]["result"]["structuredContent"];
+    assert_eq!(messages[2]["id"], 2);
+    assert_eq!(structured["status"], "cancelled");
+    assert_eq!(structured["delivery"]["effective_policy"], "none");
+}
+
+#[test]
+fn mcp_stdio_confirm_policy_sends_over_smtp_after_accept() {
+    let temp = tempdir().expect("tempdir");
+    write_dead_mail_account(temp.path(), closed_local_port(), closed_local_port());
+
+    let input = [
+        initialize_request_with_elicitation(),
+        mail_send_call(2, false),
+        mcp_response(
+            1,
+            json!({ "action": "accept", "content": { "confirm": true } }),
+        ),
+        // A second send must ask again: the confirmation is single-use.
+        mail_send_call(3, false),
+        mcp_response(
+            2,
+            json!({ "action": "accept", "content": { "confirm": false } }),
+        ),
+    ]
+    .concat();
+
+    let output = yacli()
+        .env("YACLI_CONFIG_DIR", temp.path())
+        .env("YACLI_MCP_SEND_POLICY", "confirm")
+        .args(["mcp"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let messages = parse_responses(&output);
+    assert_eq!(messages[1]["method"], "elicitation/create");
+    // Confirmed: the server went to SMTP (which is a closed port here).
+    let first = messages[2]["error"]["message"]
+        .as_str()
+        .expect("smtp error");
+    assert!(first.contains("SMTP"), "{first}");
+
+    assert_eq!(messages[3]["method"], "elicitation/create");
+    assert_eq!(messages[3]["id"], 2);
+    assert_eq!(
+        messages[4]["result"]["structuredContent"]["status"],
+        "cancelled"
+    );
 }

@@ -25,6 +25,7 @@ pub mod output;
 pub mod paths;
 mod persist;
 pub mod runtime_context;
+pub mod send_policy;
 pub mod suggestions;
 pub mod update;
 pub mod workflows;

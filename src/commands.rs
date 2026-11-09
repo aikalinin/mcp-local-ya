@@ -45,7 +45,7 @@ use crate::goal_router::goal_route_payload;
 use crate::home::home_payload;
 use crate::mail::{
     ExportedMailAttachment, ForwardedMail, InspectedMailInvite, MailAttachmentExportRequest,
-    MailAttachmentSelector, MailAttachmentSummary, MailFolder, MailForwardRequest,
+    MailAttachmentSelector, MailAttachmentSummary, MailDelivery, MailFolder, MailForwardRequest,
     MailInviteInspectRequest, MailMessage, MailMessageSummary, MailReplyRequest, MailSendRequest,
     MailSendReview, RepliedMail, SentMail, export_mail_attachment, forward_mail_message,
     inspect_mail_invite, list_mail_folders, list_mail_messages, load_mail_attachments,
@@ -2661,6 +2661,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
                     context.smtp_port,
                     auth,
                     &request,
+                    MailDelivery::Smtp,
                 )?;
                 match outcome {
                     MailSendLinkOutcome::Sent { result } => ok_output(
@@ -2778,6 +2779,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
                     context.smtp_port,
                     auth,
                     &request,
+                    MailDelivery::Smtp,
                 )?;
                 ok_output(
                     format,
@@ -2832,6 +2834,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
                     text: body,
                     html,
                 },
+                MailDelivery::Smtp,
             )?;
 
             ok_output(
@@ -2875,6 +2878,7 @@ fn execute_mail(format: OutputFormat, action: MailCommand) -> Result<RenderedOut
                     html,
                     max_source_bytes,
                 },
+                MailDelivery::Smtp,
             )?;
 
             ok_output(
