@@ -730,6 +730,7 @@ mod tests {
 
     #[test]
     fn route_goal_matches_russian_invite_flow() {
+        let _config = crate::test_support::IsolatedConfigDir::new();
         let payload = goal_route_payload(
             "найди приглашение в письме и добавь встречу в календарь",
             None,
@@ -754,6 +755,7 @@ mod tests {
 
     #[test]
     fn route_goal_matches_russian_revoke_link_flow() {
+        let _config = crate::test_support::IsolatedConfigDir::new();
         let payload = goal_route_payload("отзови публичную ссылку у файла на диске", None)
             .expect("goal route");
 
@@ -766,6 +768,7 @@ mod tests {
 
     #[test]
     fn route_goal_matches_russian_publish_link_flow() {
+        let _config = crate::test_support::IsolatedConfigDir::new();
         let payload = goal_route_payload("загрузи файл на диск и дай публичную ссылку", None)
             .expect("goal route");
 
@@ -775,6 +778,7 @@ mod tests {
 
     #[test]
     fn route_goal_extracts_canonical_hints_for_autofill() {
+        let _config = crate::test_support::IsolatedConfigDir::new();
         let payload = goal_route_payload(
             "отправь \"Материалы ревью\" на andrei@example.com файл ./review.zip через disk:/docs/review.zip в календарь team",
             None,
@@ -803,6 +807,7 @@ mod tests {
 
     #[test]
     fn route_goal_falls_back_to_catalog_for_unknown_query() {
+        let _config = crate::test_support::IsolatedConfigDir::new();
         let payload = goal_route_payload("сделай что-нибудь полезное", None).expect("goal route");
 
         assert_eq!(payload["status"], "fallback");

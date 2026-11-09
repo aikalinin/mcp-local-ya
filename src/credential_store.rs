@@ -392,19 +392,14 @@ const fn default_version() -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
 
     use super::*;
 
     use tempfile::tempdir;
 
-    static CREDENTIAL_STORE_TEST_LOCK: Mutex<()> = Mutex::new(());
-
     #[test]
     fn file_backend_round_trips_credentials_file() {
-        let _guard = CREDENTIAL_STORE_TEST_LOCK
-            .lock()
-            .expect("credential store test lock");
+        let _guard = crate::test_support::lock_config_env();
         let temp = tempdir().expect("tempdir");
         unsafe {
             env::set_var("YAMCLI_CONFIG_DIR", temp.path());
@@ -437,9 +432,7 @@ mod tests {
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     #[test]
     fn keyring_backend_migrates_legacy_credentials_file() {
-        let _guard = CREDENTIAL_STORE_TEST_LOCK
-            .lock()
-            .expect("credential store test lock");
+        let _guard = crate::test_support::lock_config_env();
         let temp = tempdir().expect("tempdir");
         unsafe {
             env::set_var("YAMCLI_CONFIG_DIR", temp.path());
@@ -481,9 +474,7 @@ mod tests {
 
     #[test]
     fn unset_secret_backend_uses_default_for_build_profile() {
-        let _guard = CREDENTIAL_STORE_TEST_LOCK
-            .lock()
-            .expect("credential store test lock");
+        let _guard = crate::test_support::lock_config_env();
         unsafe {
             env::remove_var(SECRET_BACKEND_ENV);
         }
@@ -500,9 +491,7 @@ mod tests {
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     #[test]
     fn explicit_keyring_overrides_debug_default() {
-        let _guard = CREDENTIAL_STORE_TEST_LOCK
-            .lock()
-            .expect("credential store test lock");
+        let _guard = crate::test_support::lock_config_env();
         unsafe {
             env::set_var(SECRET_BACKEND_ENV, "keyring");
         }
