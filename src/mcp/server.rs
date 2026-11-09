@@ -379,6 +379,7 @@ pub fn serve_http(listen: &str, public_url: Option<&str>) -> Result<()> {
 
     runtime.block_on(async move {
         let auth = HttpAuthConfig::from_env();
+        ensure_listen_address_is_safe(listen, &auth)?;
         let auth_discovery = HttpAuthDiscovery::from_config(listen, public_url, &auth)?;
         let state = HttpAppState {
             sessions: Arc::new(Mutex::new(HashMap::new())),
@@ -522,6 +523,17 @@ async fn handle_http_post(
         Err(err) => return http_error_response(StatusCode::BAD_REQUEST, &err.to_string(), None),
     };
 
+    // When a bearer token is configured, every request to the MCP endpoint must carry it.
+    // Earlier versions only gated `tools/call` for mail/calendar/disk, which left
+    // `resources/read` (live mailbox + disk data) and `yacli.activity.undo` reachable
+    // without credentials.
+    if !state.auth.authorized(&headers) {
+        return http_unauthorized_response(
+            required_scopes(&messages),
+            state.auth_discovery.as_ref(),
+        );
+    }
+
     if messages.iter().any(is_client_response_message) {
         if !messages.iter().all(is_client_response_message) {
             return http_error_response(
@@ -533,13 +545,6 @@ async fn handle_http_post(
         return handle_http_client_responses(&state, &headers, messages).await;
     }
 
-    if needs_http_auth(&messages) && !state.auth.authorized(&headers) {
-        return http_unauthorized_response(
-            required_scopes(&messages),
-            state.auth_discovery.as_ref(),
-        );
-    }
-
     let method = match messages[0].get("method").and_then(Value::as_str) {
         Some(method) => method,
         None => {
@@ -549,8 +554,17 @@ async fn handle_http_post(
 
     let session_header = header_value(&headers, MCP_SESSION_HEADER);
     let session_id = if method == "initialize" {
-        session_header.unwrap_or_else(new_session_id)
+        // The server always mints the session id; a client-supplied value on
+        // `initialize` is ignored to rule out session fixation.
+        new_session_id()
     } else if let Some(session_id) = session_header {
+        if !state.sessions.lock().await.contains_key(&session_id) {
+            return http_error_response(
+                StatusCode::NOT_FOUND,
+                "unknown Mcp-Session-Id session; call initialize first",
+                None,
+            );
+        }
         session_id
     } else {
         return http_error_response(
@@ -800,6 +814,9 @@ async fn handle_http_get(State(state): State<HttpAppState>, headers: HeaderMap) 
     if let Err(err) = request_origin_allowed(&headers) {
         return http_error_response(StatusCode::FORBIDDEN, &err.to_string(), None);
     }
+    if !state.auth.authorized(&headers) {
+        return http_unauthorized_response(Vec::new(), state.auth_discovery.as_ref());
+    }
 
     let session_id = match header_value(&headers, MCP_SESSION_HEADER) {
         Some(session_id) => session_id,
@@ -866,6 +883,9 @@ async fn handle_http_get(State(state): State<HttpAppState>, headers: HeaderMap) 
 async fn handle_http_delete(State(state): State<HttpAppState>, headers: HeaderMap) -> Response {
     if let Err(err) = request_origin_allowed(&headers) {
         return http_error_response(StatusCode::FORBIDDEN, &err.to_string(), None);
+    }
+    if !state.auth.authorized(&headers) {
+        return http_unauthorized_response(Vec::new(), state.auth_discovery.as_ref());
     }
 
     let session_id = match header_value(&headers, MCP_SESSION_HEADER) {
@@ -4218,27 +4238,6 @@ fn request_accepts_sse(headers: &HeaderMap) -> bool {
         .unwrap_or(false)
 }
 
-fn needs_http_auth(messages: &[Value]) -> bool {
-    messages.iter().any(message_requires_http_auth)
-}
-
-fn message_requires_http_auth(message: &Value) -> bool {
-    message.get("method").and_then(Value::as_str) == Some("tools/call")
-        && message
-            .get("params")
-            .and_then(|params| params.get("name"))
-            .and_then(Value::as_str)
-            .map(tool_requires_http_auth)
-            .unwrap_or(false)
-}
-
-fn tool_requires_http_auth(tool_name: &str) -> bool {
-    matches!(tool_name, "yacli.auth.status")
-        || tool_name.starts_with("yacli.mail.")
-        || tool_name.starts_with("yacli.calendar.")
-        || tool_name.starts_with("yacli.disk.")
-}
-
 fn read_message(reader: &mut dyn BufRead) -> Result<Option<(Value, StdioMessageFormat)>> {
     let mut content_length = None::<usize>;
     let mut line = String::new();
@@ -4366,8 +4365,49 @@ impl HttpAuthConfig {
         };
         authorization
             .strip_prefix("Bearer ")
-            .map(|token| token == expected)
+            .map(|token| constant_time_eq(token.as_bytes(), expected.as_bytes()))
             .unwrap_or(false)
+    }
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    left.iter()
+        .zip(right)
+        .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+        == 0
+}
+
+/// Refuse to expose the MCP HTTP endpoint beyond loopback unless a bearer token is set.
+/// Without a token the endpoint grants full mailbox, calendar and disk access to
+/// anyone who can reach the socket.
+fn ensure_listen_address_is_safe(listen: &str, auth: &HttpAuthConfig) -> Result<()> {
+    if auth.bearer_token.is_some() {
+        return Ok(());
+    }
+    if listen_address_is_loopback(listen) {
+        return Ok(());
+    }
+    Err(YacliError::Config(format!(
+        "refusing to listen on non-loopback address `{listen}` without authentication; \
+         set {HTTP_AUTH_TOKEN_ENV} or bind to 127.0.0.1 / [::1]"
+    )))
+}
+
+fn listen_address_is_loopback(listen: &str) -> bool {
+    use std::net::{SocketAddr, ToSocketAddrs};
+
+    if let Ok(addr) = listen.parse::<SocketAddr>() {
+        return addr.ip().is_loopback();
+    }
+    match listen.to_socket_addrs() {
+        Ok(addrs) => {
+            let addrs: Vec<SocketAddr> = addrs.collect();
+            !addrs.is_empty() && addrs.iter().all(|addr| addr.ip().is_loopback())
+        }
+        Err(_) => false,
     }
 }
 
@@ -4428,7 +4468,7 @@ fn http_unauthorized_response(
     let mut payload = json!({
         "ok": false,
         "error": "invalid_token",
-        "error_description": "protected MCP tool requires Authorization: Bearer",
+        "error_description": "MCP HTTP endpoint requires Authorization: Bearer",
     });
     if let Some(auth_discovery) = auth_discovery {
         payload["resource_metadata"] =

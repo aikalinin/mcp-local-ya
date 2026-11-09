@@ -125,6 +125,36 @@ fn post_json(
     request.send().expect("http response")
 }
 
+fn post_json_bearer(
+    client: &Client,
+    url: &str,
+    body: Value,
+    session_id: Option<&str>,
+    token: &str,
+) -> Response {
+    let mut request = client
+        .post(url)
+        .header("Authorization", format!("Bearer {token}"))
+        .json(&body);
+    if let Some(session_id) = session_id {
+        request = request.header("Mcp-Session-Id", session_id);
+    }
+    request.send().expect("http response")
+}
+
+fn initialize_request(id: u64) -> Value {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": { "name": "http-test", "version": "0.1.0" }
+        }
+    })
+}
+
 fn post_json_sse(client: &Client, url: &str, body: Value, session_id: Option<&str>) -> Response {
     let mut request = client
         .post(url)
@@ -3774,23 +3804,30 @@ rest_base_url = "https://cloud-api.yandex.net"
         ("YACLI_MCP_HTTP_AUTH_ISSUER", "https://auth.example.test"),
     ]);
     let client = client();
+    let expected_metadata_url = format!(
+        "http://{}/.well-known/oauth-protected-resource/mcp",
+        server.addr
+    );
 
-    let initialize = post_json(
+    // Even `initialize` is gated: without a token the endpoint reveals nothing.
+    let unauthenticated_initialize =
+        post_json(&client, &server.url(), initialize_request(1), None, None);
+    assert_eq!(unauthenticated_initialize.status().as_u16(), 401);
+    assert!(
+        unauthenticated_initialize
+            .headers()
+            .get("Mcp-Session-Id")
+            .is_none()
+    );
+
+    let initialize = post_json_bearer(
         &client,
         &server.url(),
-        json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2025-11-25",
-                "capabilities": {},
-                "clientInfo": { "name": "http-test", "version": "0.1.0" }
-            }
-        }),
+        initialize_request(1),
         None,
-        None,
+        "secret-token",
     );
+    assert!(initialize.status().is_success());
     let session_id = initialize
         .headers()
         .get("Mcp-Session-Id")
@@ -3814,10 +3851,6 @@ rest_base_url = "https://cloud-api.yandex.net"
         Some(&session_id),
         None,
     );
-    let expected_metadata_url = format!(
-        "http://{}/.well-known/oauth-protected-resource/mcp",
-        server.addr
-    );
     assert_eq!(unauthorized.status().as_u16(), 401);
     assert_eq!(
         unauthorized
@@ -3839,13 +3872,73 @@ rest_base_url = "https://cloud-api.yandex.net"
     );
     assert_eq!(unauthorized_payload["scope"], "yacli.auth.read");
 
+    // Wrong token is rejected the same way as a missing one.
+    let wrong_token = post_json_bearer(
+        &client,
+        &server.url(),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": { "name": "yacli.auth.status", "arguments": {} }
+        }),
+        Some(&session_id),
+        "secret-tokem",
+    );
+    assert_eq!(wrong_token.status().as_u16(), 401);
+
+    // resources/read used to bypass auth while reaching live mailbox data.
+    let unauthorized_resource = post_json(
+        &client,
+        &server.url(),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "resources/read",
+            "params": { "uri": "resource://yacli/suggestions" }
+        }),
+        Some(&session_id),
+        None,
+    );
+    assert_eq!(unauthorized_resource.status().as_u16(), 401);
+
+    // activity.undo is a write operation and also used to bypass auth.
+    let unauthorized_undo = post_json(
+        &client,
+        &server.url(),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": { "name": "yacli.activity.undo", "arguments": { "id": "x" } }
+        }),
+        Some(&session_id),
+        None,
+    );
+    assert_eq!(unauthorized_undo.status().as_u16(), 401);
+
+    // GET (SSE stream) and DELETE (session teardown) are gated as well.
+    let unauthorized_get = client
+        .get(server.url())
+        .header("Accept", "text/event-stream")
+        .header("Mcp-Session-Id", &session_id)
+        .send()
+        .expect("get response");
+    assert_eq!(unauthorized_get.status().as_u16(), 401);
+    let unauthorized_delete = client
+        .delete(server.url())
+        .header("Mcp-Session-Id", &session_id)
+        .send()
+        .expect("delete response");
+    assert_eq!(unauthorized_delete.status().as_u16(), 401);
+
     let authorized = client
         .post(server.url())
         .header("Mcp-Session-Id", &session_id)
         .header("Authorization", "Bearer secret-token")
         .json(&json!({
             "jsonrpc": "2.0",
-            "id": 3,
+            "id": 5,
             "method": "tools/call",
             "params": {
                 "name": "yacli.auth.status",
@@ -3861,6 +3954,14 @@ rest_base_url = "https://cloud-api.yandex.net"
         payload["result"]["structuredContent"]["account"],
         "personal"
     );
+
+    let authorized_delete = client
+        .delete(server.url())
+        .header("Mcp-Session-Id", &session_id)
+        .header("Authorization", "Bearer secret-token")
+        .send()
+        .expect("authorized delete");
+    assert_eq!(authorized_delete.status().as_u16(), 204);
 }
 
 #[test]
@@ -3891,21 +3992,12 @@ smtp_port = 465
     ]);
     let client = client();
 
-    let initialize = post_json(
+    let initialize = post_json_bearer(
         &client,
         &server.url(),
-        json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2025-11-25",
-                "capabilities": {},
-                "clientInfo": { "name": "http-test", "version": "0.1.0" }
-            }
-        }),
+        initialize_request(1),
         None,
-        None,
+        "secret-token",
     );
     assert!(initialize.status().is_success());
     let session_id = initialize
@@ -3972,6 +4064,67 @@ smtp_port = 465
         .expect("authorized response");
 
     assert!(authorized.status().is_success());
+}
+
+#[test]
+fn mcp_http_initialize_ignores_client_supplied_session_id() {
+    let server = TestHttpServer::spawn();
+    let client = client();
+
+    let initialize = post_json(
+        &client,
+        &server.url(),
+        initialize_request(1),
+        Some("attacker-chosen-session"),
+        None,
+    );
+    assert!(initialize.status().is_success());
+    let session_id = initialize
+        .headers()
+        .get("Mcp-Session-Id")
+        .expect("session header")
+        .to_str()
+        .expect("header string")
+        .to_string();
+    assert_ne!(session_id, "attacker-chosen-session");
+
+    // A session id that was never issued by the server is rejected.
+    let unknown = post_json(
+        &client,
+        &server.url(),
+        json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }),
+        Some("attacker-chosen-session"),
+        None,
+    );
+    assert_eq!(unknown.status().as_u16(), 404);
+
+    let known = post_json(
+        &client,
+        &server.url(),
+        json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/list" }),
+        Some(&session_id),
+        None,
+    );
+    assert!(known.status().is_success());
+}
+
+#[test]
+fn mcp_http_refuses_non_loopback_listen_without_bearer_token() {
+    let output = Command::new(cargo_bin("yacli"))
+        .args(["mcp", "--transport", "http", "--listen", "0.0.0.0:0"])
+        .env("YACLI_SECRET_BACKEND", "file")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run yacli mcp http");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        combined.contains("non-loopback") && combined.contains("YACLI_MCP_HTTP_BEARER_TOKEN"),
+        "unexpected output: {combined}"
+    );
 }
 
 #[test]
