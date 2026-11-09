@@ -30,8 +30,17 @@ use crate::paths::config_dir;
 
 pub const ALLOWED_PATHS_ENV: &str = "YACLI_MCP_ALLOWED_PATHS";
 
-const DENIED_DIR_NAMES: &[&str] = &[".ssh", ".gnupg", ".aws", ".kube", ".docker"];
-const DENIED_FILE_NAMES: &[&str] = &[".netrc", "_netrc"];
+const DENIED_DIR_NAMES: &[&str] = &[".ssh", ".gnupg", ".aws", ".kube", ".docker", ".git"];
+const DENIED_FILE_NAMES: &[&str] = &[
+    ".netrc",
+    "_netrc",
+    ".git-credentials",
+    ".npmrc",
+    ".pypirc",
+    ".gitconfig",
+    ".bash_history",
+    ".zsh_history",
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LocalAccess {
@@ -104,9 +113,28 @@ fn allowed_roots() -> Result<Vec<PathBuf>> {
                 entry.display()
             )));
         }
+        reject_overbroad_root(&canonical, &entry)?;
         roots.push(canonical);
     }
     Ok(roots)
+}
+
+/// The home directory or a filesystem root as an allowlist entry would hand
+/// the agent shell rc files, browser profiles and every credential store; the
+/// deny-list below cannot enumerate all of them, so refuse the entry outright.
+fn reject_overbroad_root(canonical: &Path, entry: &Path) -> Result<()> {
+    let is_fs_root = canonical.parent().is_none();
+    let is_home = dirs::home_dir()
+        .and_then(|home| home.canonicalize().ok())
+        .is_some_and(|home| home == canonical);
+    if is_fs_root || is_home {
+        return Err(YacliError::Config(format!(
+            "{ALLOWED_PATHS_ENV} entry `{}` is too broad (home directory or filesystem root); \
+             list specific working directories instead, e.g. `$HOME/Downloads`",
+            entry.display()
+        )));
+    }
+    Ok(())
 }
 
 fn protected_config_dir() -> Option<PathBuf> {
@@ -141,14 +169,14 @@ fn resolve_against_roots(
         LocalAccess::Write => resolve_for_write(&requested, raw)?,
     };
 
-    if !roots.iter().any(|root| resolved.starts_with(root)) {
+    let Some(matched_root) = roots.iter().find(|root| resolved.starts_with(root)) else {
         return Err(YacliError::Validation(format!(
             "refusing to {} `{raw}`: resolved path `{}` is outside {ALLOWED_PATHS_ENV}",
             access.verb(),
             resolved.display()
         )));
-    }
-    reject_denied_locations(&resolved, raw, access, protected_config_dir)?;
+    };
+    reject_denied_locations(&resolved, raw, access, protected_config_dir, matched_root)?;
     Ok(resolved)
 }
 
@@ -215,6 +243,7 @@ fn reject_denied_locations(
     raw: &str,
     access: LocalAccess,
     protected_config_dir: Option<&Path>,
+    matched_root: &Path,
 ) -> Result<()> {
     if let Some(canonical_config) = protected_config_dir
         && resolved.starts_with(canonical_config)
@@ -225,6 +254,7 @@ fn reject_denied_locations(
         )));
     }
 
+    // Credential directories are denied wherever they appear in the path.
     for component in resolved.components() {
         let Component::Normal(name) = component else {
             continue;
@@ -239,6 +269,29 @@ fn reject_denied_locations(
             )));
         }
     }
+
+    // Below the allowed root, hidden entries (`.git`, `.env`, `.bashrc`, …) are
+    // off limits: they are where config, credentials and hooks live, and an
+    // agent has no legitimate reason to touch them through mail/disk tools.
+    // The root itself may sit under a hidden directory (e.g. ~/.local/share/x).
+    if let Ok(relative) = resolved.strip_prefix(matched_root) {
+        for component in relative.components() {
+            let Component::Normal(name) = component else {
+                continue;
+            };
+            let Some(name) = name.to_str() else {
+                continue;
+            };
+            let trimmed = name.trim_end_matches([' ', '.']);
+            if trimmed.starts_with('.') {
+                return Err(YacliError::Validation(format!(
+                    "refusing to {} `{raw}`: hidden entry `{name}` is never exposed to MCP tools",
+                    access.verb()
+                )));
+            }
+        }
+    }
+
     if let Some(file_name) = resolved.file_name().and_then(|name| name.to_str())
         && DENIED_FILE_NAMES.contains(&file_name)
     {
@@ -439,5 +492,97 @@ mod tests {
         )
         .expect_err("config dir must be denied");
         assert!(err.to_string().contains("configuration directory"));
+    }
+}
+
+#[cfg(test)]
+mod hardening_tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    fn roots(dir: &Path) -> Vec<PathBuf> {
+        vec![dir.canonicalize().expect("canonical root")]
+    }
+
+    #[test]
+    fn denies_hidden_entries_below_root_for_read_and_write() {
+        let temp = tempdir().expect("tempdir");
+        let git = temp.path().join("repo").join(".git");
+        fs::create_dir_all(&git).expect("mkdir");
+        let git_config = git.join("config");
+        fs::write(&git_config, b"[core]").expect("write");
+        let env_file = temp.path().join("repo").join(".env");
+        fs::write(&env_file, b"SECRET=1").expect("write");
+        let roots = roots(temp.path());
+
+        for path in [&git_config, &env_file] {
+            let err =
+                resolve_against_roots(path.to_str().unwrap(), LocalAccess::Read, &roots, None)
+                    .expect_err("hidden read must be denied");
+            assert!(
+                err.to_string().contains("hidden") || err.to_string().contains(".git"),
+                "{err}"
+            );
+        }
+
+        // Writing a not-yet-existing hidden file (shell rc, hook) is denied too,
+        // including the Windows trailing-space/dot spelling.
+        for name in [".bashrc", ".ssh /authorized_keys", ".git./hooks"] {
+            let target = temp.path().join("repo").join(name);
+            let err =
+                resolve_against_roots(target.to_str().unwrap(), LocalAccess::Write, &roots, None)
+                    .expect_err("hidden write must be denied");
+            assert!(
+                err.to_string().contains("hidden") || err.to_string().contains("credentials"),
+                "{name}: {err}"
+            );
+        }
+
+        // A visible file next to them is fine.
+        let ok = temp.path().join("repo").join("README.md");
+        fs::write(&ok, b"# hi").expect("write");
+        assert!(
+            resolve_against_roots(ok.to_str().unwrap(), LocalAccess::Read, &roots, None).is_ok()
+        );
+    }
+
+    #[test]
+    fn root_itself_may_live_under_a_hidden_directory() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join(".local").join("share").join("exchange");
+        fs::create_dir_all(&root).expect("mkdir");
+        let file = root.join("report.pdf");
+        fs::write(&file, b"%PDF").expect("write");
+        assert!(
+            resolve_against_roots(
+                file.to_str().unwrap(),
+                LocalAccess::Read,
+                &roots(&root),
+                None
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn rejects_home_and_filesystem_root_as_allowlist_entries() {
+        let fs_root = if cfg!(windows) {
+            PathBuf::from("C:\\")
+        } else {
+            PathBuf::from("/")
+        };
+        let err = reject_overbroad_root(&fs_root.canonicalize().expect("root"), &fs_root)
+            .expect_err("filesystem root must be rejected");
+        assert!(err.to_string().contains("too broad"), "{err}");
+
+        if let Some(home) = dirs::home_dir().and_then(|home| home.canonicalize().ok()) {
+            let err = reject_overbroad_root(&home, &home).expect_err("home must be rejected");
+            assert!(err.to_string().contains("too broad"), "{err}");
+        }
+
+        let temp = tempdir().expect("tempdir");
+        let canonical = temp.path().canonicalize().expect("canonical");
+        assert!(reject_overbroad_root(&canonical, temp.path()).is_ok());
     }
 }

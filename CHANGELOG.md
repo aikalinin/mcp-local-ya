@@ -32,6 +32,20 @@
 - Security notes in tool descriptions, embedded prompts and all `SKILL.md`
   files: mail/calendar/disk content is untrusted data, never instructions.
 - `yacli doctor` reports the `YACLI_MCP_ALLOWED_PATHS` state.
+- Drafts keep `Bcc:` as a header (SMTP carries Bcc only in the envelope) and
+  go through the same size guard as SMTP sends, so oversized mail gets the
+  send-link remediation instead of an unsendable draft.
+- `confirm` dialogs for `mail.reply` / `mail.forward` resolve the real
+  recipient from the original message (`Reply-To` / `From`) and show it,
+  plus HTML body size and a tag-stripped preview.
+- Allowlist: hidden entries (`.git`, `.env`, shell rc files, …) below an
+  allowed root are denied for both read and write; `.git`,
+  `.git-credentials`, `.npmrc`, `.pypirc`, `.gitconfig` and shell histories
+  joined the deny-list; the home directory and filesystem roots are refused
+  as allowlist entries.
+- A nested mail-sending call while a confirmation is pending is refused
+  instead of stalling the session; a client that advertises elicitation but
+  fails to serve it degrades to `draft`.
 
 ### Unchanged
 

@@ -528,13 +528,14 @@ pub fn save_mail_draft(
     request: MailSendRequest,
 ) -> Result<SentMail> {
     let prepared = prepare_mail_submission(auth.clone(), request)?;
+    // A draft the human cannot send is worse than an early error: apply the
+    // same size guard as the SMTP path so oversized mail gets the send-link hint.
+    ensure_smtp_safe_submission(&prepared)?;
+    let message = draft_message_with_bcc(&prepared.message, &prepared.bcc);
     let mut session = open_authenticated_session(imap_host, imap_port, auth)?;
     let folder = session.resolve_drafts_mailbox()?;
-    let uid = session.append_message(
-        &folder.raw_name,
-        &["\\Draft", "\\Seen"],
-        prepared.message.as_bytes(),
-    )?;
+    let uid =
+        session.append_message(&folder.raw_name, &["\\Draft", "\\Seen"], message.as_bytes())?;
     let _ = session.logout();
     let mut sent = prepared.sent;
     sent.delivery = "draft".to_string();
@@ -759,6 +760,29 @@ fn open_authenticated_session(
     Ok(session)
 }
 
+/// Resolved recipient and subject a reply/forward of message `uid` would use.
+/// Used to show the human the *actual* target (which may come from an
+/// attacker-controlled `Reply-To`) before confirming a send.
+#[derive(Clone, Debug, Serialize, Eq, PartialEq)]
+pub struct MailMessagePeek {
+    pub recipient: String,
+    pub subject: String,
+}
+
+pub fn peek_mail_message(
+    imap_host: &str,
+    imap_port: u16,
+    auth: MailSessionAuth,
+    mailbox_name: &str,
+    uid: u64,
+) -> Result<MailMessagePeek> {
+    let target = fetch_reply_target(imap_host, imap_port, auth, mailbox_name, uid)?;
+    Ok(MailMessagePeek {
+        recipient: target.recipient,
+        subject: target.subject,
+    })
+}
+
 fn fetch_reply_target(
     imap_host: &str,
     imap_port: u16,
@@ -796,6 +820,10 @@ struct PreparedMailSubmission {
     attachments: Vec<MailAttachmentPayload>,
     envelope_from: String,
     envelope_recipients: Vec<String>,
+    /// Blind-copy recipients. Not part of `message` (SMTP carries them only in
+    /// the envelope); drafts re-add them as a `Bcc:` header so the mail client
+    /// can honour them when the human sends.
+    bcc: Vec<String>,
     message: String,
     sent: SentMail,
 }
@@ -1115,13 +1143,21 @@ impl<S: Read + Write> ImapSession<S> {
             message.len()
         ))?;
 
-        let continuation = self.read_line()?;
-        if !continuation.starts_with('+') {
-            if continuation.starts_with(&tag) {
-                parse_tagged_status(&tag, &continuation, "IMAP APPEND", TaggedErrorKind::Api)?;
+        loop {
+            let line = self.read_line()?;
+            if line.starts_with('+') {
+                break;
+            }
+            if line.starts_with("* ") {
+                // Unsolicited untagged response (EXISTS, OK, ...) before the
+                // continuation; keep waiting.
+                continue;
+            }
+            if line.starts_with(&tag) {
+                parse_tagged_status(&tag, &line, "IMAP APPEND", TaggedErrorKind::Api)?;
             }
             return Err(YacliError::Api(format!(
-                "IMAP APPEND literal was not accepted: {continuation}"
+                "IMAP APPEND literal was not accepted: {line}"
             )));
         }
 
@@ -1566,6 +1602,7 @@ fn prepare_mail_submission(
         attachments,
         envelope_from: from.clone(),
         envelope_recipients,
+        bcc: bcc.clone(),
         message,
         sent: SentMail {
             from,
@@ -2146,6 +2183,23 @@ fn extract_trailing_literal_len(line: &str) -> Result<Option<usize>> {
         ))
     })?;
     Ok(Some(value))
+}
+
+/// SMTP submissions carry Bcc only in the envelope. A stored draft has no
+/// envelope, so the addresses are re-added as a `Bcc:` header; mail clients
+/// keep it in the draft and strip it on send.
+fn draft_message_with_bcc(message: &str, bcc: &[String]) -> String {
+    if bcc.is_empty() {
+        return message.to_string();
+    }
+    let header = format!("Bcc: {}\r\n", bcc.join(", "));
+    match message.find("\r\n\r\n") {
+        Some(split) => {
+            let (headers, rest) = message.split_at(split + 2);
+            format!("{headers}{header}{rest}")
+        }
+        None => format!("{header}{message}"),
+    }
 }
 
 fn select_drafts_mailbox(folders: &[MailFolder]) -> Result<MailFolder> {
@@ -3021,13 +3075,13 @@ mod tests {
         MailMessage, MailSendRequest, MailSessionAuth, MailThreadHeaders, OutgoingMessage,
         SMTP_SAFE_MESSAGE_BYTES, SmtpSession, build_forward_body, build_message_summary,
         build_outgoing_message, build_read_message, build_reply_target, build_xoauth2_payload,
-        decode_modified_utf7, encode_modified_utf7, export_attachment_from_message,
-        extract_message_content, inspect_invite_from_message, load_mail_attachments,
-        normalize_forward_subject, normalize_reply_subject, normalize_search_query,
-        parse_appenduid, parse_fetch_metadata, parse_imap_token, parse_list_line,
-        parse_search_uids, prepare_mail_submission, quote_imap_string, review_mail_submission,
-        select_drafts_mailbox, send_mail_message, validate_mail_attachment_export_request,
-        validate_mail_attachment_read_request,
+        decode_modified_utf7, draft_message_with_bcc, encode_modified_utf7,
+        export_attachment_from_message, extract_message_content, inspect_invite_from_message,
+        load_mail_attachments, normalize_forward_subject, normalize_reply_subject,
+        normalize_search_query, parse_appenduid, parse_fetch_metadata, parse_imap_token,
+        parse_list_line, parse_search_uids, prepare_mail_submission, quote_imap_string,
+        review_mail_submission, select_drafts_mailbox, send_mail_message,
+        validate_mail_attachment_export_request, validate_mail_attachment_read_request,
     };
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD;
@@ -4074,5 +4128,29 @@ mod tests {
             .append_message("Drafts", &["\\Draft"], b"x")
             .expect_err("append must fail");
         assert!(err.to_string().contains("APPEND"), "{err}");
+    }
+    #[test]
+    fn draft_message_with_bcc_inserts_header_before_body() {
+        let message = "From: a@example.com\r\nSubject: Hi\r\n\r\nbody\r\n";
+        let with_bcc = draft_message_with_bcc(
+            message,
+            &["x@example.com".to_string(), "y@example.com".to_string()],
+        );
+        assert_eq!(
+            with_bcc,
+            "From: a@example.com\r\nSubject: Hi\r\nBcc: x@example.com, y@example.com\r\n\r\nbody\r\n"
+        );
+        assert_eq!(draft_message_with_bcc(message, &[]), message);
+    }
+
+    #[test]
+    fn imap_append_message_tolerates_untagged_lines_before_continuation() {
+        let script = "* 12 EXISTS\r\n+ OK\r\nA0001 OK [APPENDUID 1 5] done\r\n";
+        let stream = FakeStream::new(script);
+        let mut session = ImapSession::from_stream(stream);
+        let uid = session
+            .append_message("Drafts", &["\\Draft"], b"x")
+            .expect("append");
+        assert_eq!(uid, Some(5));
     }
 }

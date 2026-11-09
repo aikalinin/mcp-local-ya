@@ -254,6 +254,9 @@ struct SessionState {
     /// Set by the transport layer after the human accepted an elicitation for
     /// the very next mail-sending tool call; consumed by that call.
     send_confirmed_once: bool,
+    /// An `elicitation/create` is in flight; nested mail-sending calls are
+    /// refused until the human answers (otherwise the outer wait could stall).
+    elicitation_pending: bool,
     supports_roots_requests: bool,
     roots_list_changed_supported: bool,
     roots_dirty: bool,
@@ -271,6 +274,7 @@ impl SessionState {
             supports_resource_subscriptions: true,
             supports_elicitation: false,
             send_confirmed_once: false,
+            elicitation_pending: false,
             supports_roots_requests: false,
             roots_list_changed_supported: false,
             roots_dirty: false,
@@ -288,6 +292,7 @@ impl SessionState {
             supports_resource_subscriptions: true,
             supports_elicitation: false,
             send_confirmed_once: false,
+            elicitation_pending: false,
             supports_roots_requests: false,
             roots_list_changed_supported: false,
             roots_dirty: false,
@@ -4385,6 +4390,12 @@ fn confirm_mail_send_stdio(
         return Ok(None);
     }
 
+    if session.elicitation_pending {
+        return Err(YacliError::Validation(
+            "another send confirmation is still waiting for the user's answer; retry this tool call after it is answered".to_string(),
+        ));
+    }
+
     let summary = describe_mail_send_for_confirmation(tool_name, &arguments);
     let elicitation = json!({
         "message": format!(
@@ -4402,6 +4413,7 @@ fn confirm_mail_send_stdio(
             "required": ["confirm"]
         }
     });
+    session.elicitation_pending = true;
     let response = stdio_client_request(
         session,
         writer,
@@ -4409,7 +4421,18 @@ fn confirm_mail_send_stdio(
         poller,
         "elicitation/create",
         Some(elicitation),
-    )?;
+    );
+    session.elicitation_pending = false;
+    let response = match response {
+        Ok(response) => response,
+        Err(YacliError::UnsupportedOperation(_)) => {
+            // The client claimed elicitation support but cannot serve it.
+            // Degrade to the draft path (decide_mail_delivery reports why).
+            session.supports_elicitation = false;
+            return Ok(None);
+        }
+        Err(err) => return Err(err),
+    };
     let result = response.get("result").cloned().unwrap_or(Value::Null);
     let action = result
         .get("action")
@@ -4448,11 +4471,45 @@ fn confirm_mail_send_stdio(
 
 fn describe_mail_send_for_confirmation(tool_name: &str, arguments: &Value) -> String {
     let mut lines = Vec::new();
-    if let Some(account) = arguments.get("account").and_then(Value::as_str) {
+    let account = arguments.get("account").and_then(Value::as_str);
+    if let Some(account) = account {
         lines.push(format!("Аккаунт: {account}"));
     }
     if let Some(to) = arguments.get("to").and_then(Value::as_str) {
         lines.push(format!("Кому: {to}"));
+    }
+    // For reply the recipient is not in the arguments: it comes from the
+    // original message's Reply-To / From, which an attacker controls. Resolve
+    // it so the human sees the real destination. Forward shows the source too.
+    if matches!(tool_name, "yacli.mail.reply" | "yacli.mail.forward")
+        && let Some(uid) = arguments.get("uid").and_then(Value::as_u64)
+    {
+        let folder = arguments
+            .get("folder")
+            .and_then(Value::as_str)
+            .unwrap_or("INBOX");
+        match resolve_mail_private_context(account).and_then(|(_, auth, context)| {
+            crate::mail::peek_mail_message(&context.imap_host, context.imap_port, auth, folder, uid)
+        }) {
+            Ok(peek) if tool_name == "yacli.mail.reply" => {
+                lines.push(format!(
+                    "Кому (из Reply-To/From письма {uid}): {}",
+                    peek.recipient
+                ));
+                lines.push(format!("Тема исходного письма: {}", peek.subject));
+            }
+            Ok(peek) => {
+                lines.push(format!(
+                    "Пересылается письмо {uid} от {}: {}",
+                    peek.recipient, peek.subject
+                ));
+            }
+            Err(err) => {
+                lines.push(format!(
+                    "ВНИМАНИЕ: не удалось определить получателя/тему письма {uid}: {err}"
+                ));
+            }
+        }
     }
     for (key, label) in [("cc", "Копия"), ("bcc", "Скрытая копия")] {
         if let Some(list) = arguments.get(key).and_then(Value::as_array)
@@ -4491,10 +4548,36 @@ fn describe_mail_send_for_confirmation(tool_name: &str, arguments: &Value) -> St
         let preview: String = text.chars().take(200).collect();
         lines.push(format!("Текст: {preview}"));
     }
+    if let Some(html) = arguments.get("html").and_then(Value::as_str) {
+        let stripped = strip_html_tags(html);
+        let preview: String = stripped.chars().take(200).collect();
+        lines.push(format!(
+            "HTML-тело ({} байт), текст без тегов: {preview}",
+            html.len()
+        ));
+    }
     if lines.is_empty() {
         lines.push(format!("Инструмент: {tool_name}"));
     }
     lines.join("\n")
+}
+
+/// Crude tag stripper for confirmation previews; not a sanitizer.
+fn strip_html_tags(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for ch in html.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' if in_tag => {
+                in_tag = false;
+                out.push(' ');
+            }
+            _ if !in_tag => out.push(ch),
+            _ => {}
+        }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn roots_tool_response(roots: Vec<Value>, ui_enabled: bool) -> Result<Value> {
