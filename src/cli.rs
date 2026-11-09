@@ -598,6 +598,12 @@ pub enum MailCommand {
         cc: Vec<String>,
         #[arg(long, value_name = "HTML")]
         html: Option<String>,
+        #[arg(
+            long,
+            default_value_t = false,
+            help = "Сохранить ответ в Черновики, не отправляя"
+        )]
+        draft: bool,
     },
     /// Переслать письмо по ID из `mail list` или `mail search`.
     Forward {
@@ -619,6 +625,12 @@ pub enum MailCommand {
         html: Option<String>,
         #[arg(long, default_value_t = 15 * 1024 * 1024, value_name = "БАЙТЫ")]
         max_source_bytes: u64,
+        #[arg(
+            long,
+            default_value_t = false,
+            help = "Сохранить пересылку в Черновики, не отправляя"
+        )]
+        draft: bool,
     },
     /// Открыть письмо по ID из `mail list` или `mail search`.
     Read {
@@ -655,6 +667,12 @@ pub enum MailCommand {
             help = "Только проверить и показать, что будет отправлено, без реальной отправки"
         )]
         dry_run: bool,
+        #[arg(
+            long,
+            default_value_t = false,
+            help = "Сохранить письмо в Черновики, не отправляя"
+        )]
+        draft: bool,
     },
     /// Загрузить файл на Диск, опубликовать ссылку и отправить её письмом.
     SendLink {

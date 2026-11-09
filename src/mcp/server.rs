@@ -47,7 +47,7 @@ use crate::runtime_context::{
     resolve_mail_private_context,
 };
 use crate::send_policy::{
-    SEND_POLICY_ENV, SendPolicy, configured_send_policy, is_mail_sending_tool,
+    SEND_POLICY_ENV, SendPolicy, configured_send_policy, is_mail_draft_tool, is_mail_sending_tool,
 };
 use crate::suggestions::suggestions_payload;
 use crate::update::check_for_update;
@@ -1444,6 +1444,87 @@ fn tool_definitions(ui_enabled: bool, roots_enabled: bool) -> Vec<Value> {
             ui_enabled,
         ),
         tool(
+            "yamcli.mail.draft",
+            "Save one new mail message to the Drafts folder without sending it.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string" },
+                    "to": { "type": "string" },
+                    "cc": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                    },
+                    "bcc": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                    },
+                    "subject": { "type": "string" },
+                    "text": { "type": "string" },
+                    "html": { "type": "string" },
+                    "attachments": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                    },
+                    "dry_run": { "type": "boolean" }
+                },
+                "required": ["to", "subject"],
+                "additionalProperties": false
+            }),
+            None,
+            ui_enabled,
+        ),
+        tool(
+            "yamcli.mail.draft_reply",
+            "Save a reply to one message (by UID) to the Drafts folder without sending it.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string" },
+                    "folder": { "type": "string" },
+                    "uid": { "type": "integer", "minimum": 1 },
+                    "text": { "type": "string" },
+                    "html": { "type": "string" },
+                    "cc": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                    }
+                },
+                "required": ["uid"],
+                "additionalProperties": false
+            }),
+            None,
+            ui_enabled,
+        ),
+        tool(
+            "yamcli.mail.draft_forward",
+            "Save a forward of one message (by UID) to the Drafts folder without sending it.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string" },
+                    "folder": { "type": "string" },
+                    "uid": { "type": "integer", "minimum": 1 },
+                    "to": { "type": "string" },
+                    "text": { "type": "string" },
+                    "html": { "type": "string" },
+                    "cc": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                    },
+                    "bcc": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                    },
+                    "max_source_bytes": { "type": "integer", "minimum": 1 }
+                },
+                "required": ["uid", "to"],
+                "additionalProperties": false
+            }),
+            None,
+            ui_enabled,
+        ),
+        tool(
             "yamcli.mail.attachment.export",
             "Export one mail attachment to a local file on the MCP server host.",
             json!({
@@ -1745,6 +1826,12 @@ Inspect `status` and `delivery.effective_policy` in the result and tell the user
 happened; never claim a message was sent when status is `draft_saved`. Local file paths must \
 lie inside YAMCLI_MCP_ALLOWED_PATHS.";
 
+const MAIL_DRAFT_ONLY_NOTE: &str = "This tool never sends mail, whatever \
+YAMCLI_MCP_SEND_POLICY says: the message is always stored in the Drafts folder (status \
+`draft_saved`) and the user sends it from their mail client. Use it when the user asks to \
+prepare, draft or write a message rather than send it. Local file paths must lie inside \
+YAMCLI_MCP_ALLOWED_PATHS.";
+
 const LOCAL_FILE_NOTE: &str = "Local paths must lie inside YAMCLI_MCP_ALLOWED_PATHS on the MCP \
 server host; anything else is rejected.";
 
@@ -1760,6 +1847,9 @@ fn tool_safety_note(name: &str) -> Option<&'static str> {
         | "yamcli.mail.forward"
         | "yamcli.mail.send_link"
         | "yamcli.mail.send_published_link" => Some(MAIL_SEND_POLICY_NOTE),
+        "yamcli.mail.draft" | "yamcli.mail.draft_reply" | "yamcli.mail.draft_forward" => {
+            Some(MAIL_DRAFT_ONLY_NOTE)
+        }
         "yamcli.mail.attachment.export"
         | "yamcli.disk.upload"
         | "yamcli.disk.upload_link"
@@ -1783,6 +1873,9 @@ fn tool_annotations(name: &str) -> Value {
         }
         "yamcli.calendar.create"
         | "yamcli.mail.invite.create_event"
+        | "yamcli.mail.draft"
+        | "yamcli.mail.draft_reply"
+        | "yamcli.mail.draft_forward"
         | "yamcli.disk.upload"
         | "yamcli.disk.mkdir"
         | "yamcli.disk.download"
@@ -1873,6 +1966,18 @@ fn decide_mail_delivery(session: &mut SessionState) -> Result<MailDeliveryDecisi
     })
 }
 
+/// Delivery for the draft-only tools: always the Drafts folder, regardless of
+/// the configured policy, and without consuming a pending send confirmation.
+fn draft_only_delivery(tool_name: &str) -> MailDeliveryDecision {
+    MailDeliveryDecision {
+        configured: configured_send_policy().unwrap_or(SendPolicy::Draft),
+        effective: SendPolicy::Draft,
+        reason: format!(
+            "tool `{tool_name}` only stores the message in the Drafts folder; it never sends, whatever {SEND_POLICY_ENV} says"
+        ),
+    }
+}
+
 fn required_delivery(delivery: Option<&MailDeliveryDecision>) -> Result<&MailDeliveryDecision> {
     delivery.ok_or_else(|| {
         YamcliError::Validation("internal error: mail delivery decision missing".to_string())
@@ -1891,6 +1996,8 @@ fn call_tool(params: Value, session: &mut SessionState) -> Result<Value> {
         .unwrap_or(Value::Object(Map::new()));
     let delivery = if is_mail_sending_tool(name) {
         Some(decide_mail_delivery(session)?)
+    } else if is_mail_draft_tool(name) {
+        Some(draft_only_delivery(name))
     } else {
         None
     };
@@ -1941,7 +2048,7 @@ fn call_tool(params: Value, session: &mut SessionState) -> Result<Value> {
             required_u64(&arguments, "uid")?,
             optional_u64(&arguments, "max_bytes").unwrap_or(15 * 1024 * 1024),
         )?,
-        "yamcli.mail.send" => mail_send(
+        "yamcli.mail.send" | "yamcli.mail.draft" => mail_send(
             arguments.get("account").and_then(Value::as_str),
             MailSendToolRequest {
                 to: required_string(&arguments, "to")?.to_string(),
@@ -1985,7 +2092,7 @@ fn call_tool(params: Value, session: &mut SessionState) -> Result<Value> {
             },
             required_delivery(delivery)?,
         )?,
-        "yamcli.mail.reply" => mail_reply(
+        "yamcli.mail.reply" | "yamcli.mail.draft_reply" => mail_reply(
             arguments.get("account").and_then(Value::as_str),
             optional_string(&arguments, "folder").unwrap_or("INBOX"),
             required_u64(&arguments, "uid")?,
@@ -1994,7 +2101,7 @@ fn call_tool(params: Value, session: &mut SessionState) -> Result<Value> {
             optional_string_owned(&arguments, "html"),
             required_delivery(delivery)?,
         )?,
-        "yamcli.mail.forward" => mail_forward(
+        "yamcli.mail.forward" | "yamcli.mail.draft_forward" => mail_forward(
             arguments.get("account").and_then(Value::as_str),
             MailForwardToolRequest {
                 folder: optional_string(&arguments, "folder")

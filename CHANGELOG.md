@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0 — draft-only mail
+
+### Added
+
+- MCP tools `yamcli.mail.draft`, `yamcli.mail.draft_reply` and
+  `yamcli.mail.draft_forward` always store the message in the Drafts folder and
+  never send it, regardless of `YAMCLI_MCP_SEND_POLICY`. They do not trigger a
+  send confirmation and are annotated as non-destructive, so hosts can allow them
+  without prompting.
+- CLI flag `--draft` for `mail send`, `mail reply` and `mail forward` saves the
+  message to Drafts instead of sending it. `mail send` table output now shows
+  `delivery` and the draft location.
+
 ## 1.0.0 — first release of yamcli (mcp-local-ya)
 
 ### Rename: yacli → yamcli

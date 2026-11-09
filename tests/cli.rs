@@ -7228,3 +7228,100 @@ rest_base_url = "{}"
 
     assert_eq!(fs::read(&output_path).expect("existing file"), b"existing");
 }
+
+fn write_dead_local_mail_account(config_dir: &std::path::Path) {
+    let closed_port = || {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        listener.local_addr().expect("addr").port()
+    };
+    let (imap_port, smtp_port) = (closed_port(), closed_port());
+    write_accounts_file(
+        config_dir,
+        &format!(
+            r#"
+version = 1
+
+[accounts.mock]
+email = "me@yandex.ru"
+default = true
+
+[accounts.mock.mail]
+enabled = true
+auth_mode = "oauth_xoauth2"
+imap_host = "127.0.0.1"
+imap_port = {imap_port}
+smtp_host = "127.0.0.1"
+smtp_port = {smtp_port}
+credential_ref = "store:mail"
+
+[accounts.mock.calendar]
+enabled = false
+auth_mode = "app_password"
+caldav_base_url = "https://caldav.yandex.ru"
+
+[accounts.mock.disk]
+enabled = false
+auth_mode = "oauth"
+rest_base_url = "https://cloud-api.yandex.net"
+"#
+        ),
+    );
+    write_credentials_file(
+        config_dir,
+        r#"
+version = 1
+
+[accounts.mock.services.mail]
+kind = "oauth_pkce"
+access_token = "mail-token"
+token_type = "bearer"
+expires_at_epoch_secs = 4102444800
+scope = ["mail:imap_full", "mail:smtp"]
+client_id = "client-123"
+"#,
+    );
+}
+
+#[test]
+fn mail_send_reply_and_forward_with_draft_flag_go_to_imap_not_smtp() {
+    let temp = tempdir().expect("tempdir");
+    write_dead_local_mail_account(temp.path());
+
+    for args in [
+        vec![
+            "mail",
+            "send",
+            "--draft",
+            "person@example.com",
+            "Тема",
+            "Текст",
+        ],
+        vec!["mail", "reply", "--draft", "7", "Ответ"],
+        vec!["mail", "forward", "--draft", "7", "person@example.com"],
+    ] {
+        let output = yamcli()
+            .env("YAMCLI_CONFIG_DIR", temp.path())
+            .args(&args)
+            .assert()
+            .failure()
+            .get_output()
+            .stderr
+            .clone();
+        let stderr = String::from_utf8_lossy(&output);
+        assert!(stderr.contains("IMAP"), "{args:?}: {stderr}");
+        assert!(!stderr.contains("SMTP"), "{args:?}: {stderr}");
+    }
+}
+
+#[test]
+fn mail_send_without_draft_flag_still_uses_smtp() {
+    let temp = tempdir().expect("tempdir");
+    write_dead_local_mail_account(temp.path());
+
+    yamcli()
+        .env("YAMCLI_CONFIG_DIR", temp.path())
+        .args(["mail", "send", "person@example.com", "Тема", "Текст"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("SMTP"));
+}

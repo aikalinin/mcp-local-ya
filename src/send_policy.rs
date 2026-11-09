@@ -72,6 +72,18 @@ pub fn is_mail_sending_tool(tool_name: &str) -> bool {
     MAIL_SENDING_TOOLS.contains(&tool_name)
 }
 
+/// Tools that only ever store a message in the Drafts folder. They are not
+/// governed by the send policy and never trigger a send confirmation.
+pub const MAIL_DRAFT_TOOLS: &[&str] = &[
+    "yamcli.mail.draft",
+    "yamcli.mail.draft_reply",
+    "yamcli.mail.draft_forward",
+];
+
+pub fn is_mail_draft_tool(tool_name: &str) -> bool {
+    MAIL_DRAFT_TOOLS.contains(&tool_name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,5 +109,14 @@ mod tests {
         }
         assert!(!is_mail_sending_tool("yamcli.mail.read"));
         assert!(!is_mail_sending_tool("yamcli.disk.publish"));
+    }
+
+    #[test]
+    fn draft_only_tools_are_never_treated_as_sending_tools() {
+        for tool in MAIL_DRAFT_TOOLS {
+            assert!(is_mail_draft_tool(tool), "{tool}");
+            assert!(!is_mail_sending_tool(tool), "{tool}");
+        }
+        assert!(!is_mail_draft_tool("yamcli.mail.send"));
     }
 }
