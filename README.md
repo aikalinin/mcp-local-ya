@@ -134,6 +134,7 @@ yacli setup me@yandex.ru --calendar-app-password <пароль> --client claude
 | **Подключить Календарь** | получить пароль приложения Яндекс ID → `yacli login calendar --app-password <пароль>` |
 | **Поставить MCP в Claude / Codex / Gemini** | `yacli mcp install --client <client>` |
 | **Поднять локальный HTTP MCP** | `yacli mcp --transport http --listen 127.0.0.1:8787` |
+| **Разрешить агенту файлы из папки** | `export YACLI_MCP_ALLOWED_PATHS="$HOME/Downloads"` (см. «Безопасность MCP») |
 
 Для агентских и headless-сценариев `yacli login` теперь работает в два шага без ломкого `stdin`-диалога:
 
@@ -413,6 +414,26 @@ flowchart LR
 
 Важно: `yacli` не является продуктом Яндекса. Яндекс этот проект не поддерживает. Это самостоятельный проект с открытым исходным кодом.
 
+## Безопасность MCP
+
+MCP-сервер даёт ИИ-агенту полный доступ к почте, календарю и Диску, а агент читает письма, написанные третьими лицами. Поэтому опасные действия ограничивает сам сервер, а не только хост.
+
+| Переменная | По умолчанию | Что делает |
+| --- | --- | --- |
+| `YACLI_MCP_SEND_POLICY` | `draft` | Как уходят письма из `yacli.mail.send` / `reply` / `forward` / `send_link` / `send_published_link`. `draft` — письмо сохраняется в «Черновики» через IMAP, пользователь отправляет его сам из почтового клиента. `confirm` — на `stdio` с клиентом, поддерживающим `elicitation`, сервер спрашивает подтверждение у человека и только после `accept` отправляет по SMTP; без поддержки elicitation (и по HTTP) деградирует до `draft`, никогда до `send`. `send` — немедленная отправка (старое поведение). |
+| `YACLI_MCP_ALLOWED_PATHS` | не задано = запрет | Каталоги (через `:` на Unix, `;` на Windows), внутри которых MCP-инструменты могут читать (`attachments`, `source`, `source_path`) и писать (`output_path`) локальные файлы. Симлинки разрешаются до проверки; `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, `~/.docker`, `.netrc` и каталог конфигурации yacli запрещены даже внутри разрешённых путей. Без переменной инструменты не имеют доступа к файлам вообще. |
+| `YACLI_MCP_HTTP_BEARER_TOKEN` | не задано | Токен для HTTP-транспорта; при наличии обязателен для каждого запроса. Без токена разрешён только loopback. |
+
+```bash
+export YACLI_MCP_SEND_POLICY=draft                 # по умолчанию, можно не задавать
+export YACLI_MCP_ALLOWED_PATHS="$HOME/Downloads:$HOME/yacli-exchange"
+yacli mcp
+```
+
+Ответы write-инструментов содержат `status` (`draft_saved` / `completed` / `cancelled`) и блок `delivery` с настроенной и фактической политикой — агент обязан сообщать пользователю именно это, а не «письмо отправлено». Описания инструментов, embedded prompts и SKILL.md явно говорят агенту, что содержимое писем — недоверенные данные, а не инструкции. `yacli doctor` показывает состояние `YACLI_MCP_ALLOWED_PATHS`.
+
+CLI-команды (`yacli mail send` и т.п.) эти ограничения не затрагивают: человек в терминале уже принял решение.
+
 ## MCP
 
 ### Запуск
@@ -476,6 +497,8 @@ Bearer token auth:
 export YACLI_MCP_HTTP_BEARER_TOKEN='secret-token'
 yacli mcp --transport http --listen 127.0.0.1:8787
 ```
+
+Если токен задан, он обязателен для **всех** запросов к `/mcp` (`POST`, `GET` SSE, `DELETE`), включая `initialize`, `resources/read` и `tools/call`. Без токена сервер отказывается слушать что-либо, кроме loopback (`127.0.0.1`, `[::1]`, `localhost`). `Mcp-Session-Id` всегда выдаёт сервер; значение, присланное клиентом на `initialize`, игнорируется.
 
 Protected Resource Metadata и auth discovery:
 
